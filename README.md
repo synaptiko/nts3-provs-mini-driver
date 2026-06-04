@@ -1,57 +1,49 @@
 # NTS-3 Pro VS Mini Driver
 
-macOS MIDI remapper for the Korg NTS-3 kaoss pad kit.
+macOS menu-bar CoreMIDI bridge for controlling a Behringer Pro VS Mini from a Korg NTS-3.
 
-The app connects to the NTS-3 MIDI source, creates a virtual MIDI source named `NTS-3 Pro VS Mini Driver`, and emits only the mapped CC stream defined in [MAPPING_SPEC.md](MAPPING_SPEC.md). Unmapped incoming MIDI is ignored.
+The app listens to the NTS-3, keeps NTS-3 pad values internally as 14-bit controls, converts confirmed Pro VS targets to 7-bit MIDI CC, and sends directly to a matched Pro VS Mini MIDI destination. It does not create a DAW virtual source.
+
+Global vector X/Y is intentionally unmapped for now. The Pro VS Mini manuals do not document a safe realtime joystick/vector X/Y MIDI target, so that path is left for hardware experiments.
 
 ## Requirements
 
 - macOS 13 or newer
-- Swift toolchain / Xcode command line tools
+- Swift toolchain or Xcode command line tools
 - Korg NTS-3 connected over USB
+- Behringer Pro VS Mini connected over USB or MIDI
+- Pro VS Mini external MIDI CC receive enabled
 
-## Run
+## Commands
 
-List the MIDI endpoints CoreMIDI can see:
+List CoreMIDI sources and destinations:
 
 ```sh
 swift run nts3-provs-mini-driver --list
 ```
 
-Run the default pair-mode remapper:
+Run the bridge in the terminal:
 
 ```sh
 swift run nts3-provs-mini-driver
 ```
 
-Run 7-bit trim mode:
-
-```sh
-swift run nts3-provs-mini-driver --trim
-```
-
-Open the menu-bar app:
+Open the menu-bar app and Debug window support:
 
 ```sh
 swift run nts3-provs-mini-driver --ui
 ```
 
-Run deterministic mapping checks without hardware:
+Run deterministic tests without hardware:
 
 ```sh
 swift run nts3-provs-mini-driver --self-test
 ```
 
-If CoreMIDI exposes the device under a different name:
+Use custom endpoint filters or MIDI channel:
 
 ```sh
-swift run nts3-provs-mini-driver --input "kaoss"
-```
-
-Change the virtual source name shown in a DAW:
-
-```sh
-swift run nts3-provs-mini-driver --virtual-name "NTS-3 Ableton Control"
+swift run nts3-provs-mini-driver --input "NTS-3" --output "PRO VS" --channel 1
 ```
 
 Build a release binary:
@@ -60,7 +52,7 @@ Build a release binary:
 swift build -c release
 ```
 
-The release binary will be at:
+The release binary is:
 
 ```sh
 .build/release/nts3-provs-mini-driver
@@ -68,122 +60,77 @@ The release binary will be at:
 
 ## CLI Options
 
-- `--input <text>`: connect only to source names containing this text. Default: `NTS-3`.
-- `--virtual-name <name>`: set the virtual MIDI source name. Default: `NTS-3 Pro VS Mini Driver`.
-- `--ui`: launch the menu-bar app and auto-start the bridge.
-- `--trim`: emit only mapped MSB CCs as 7-bit values.
-- `--all`: connect every available MIDI source except the app's own virtual source.
-- `--quiet`: remap MIDI without per-message logs.
-- `--show-realtime`: include timing clock and active sensing in logs.
-- `--self-test`: run deterministic mapping checks and exit.
-- `--list`: print available sources and destinations.
+- `--input <text>`: source name substring. Default: `NTS-3`.
+- `--output <text>`: destination name substring. Default: `PRO VS`.
+- `--channel <1-16>`: output MIDI channel. Default: `1`.
+- `--ui`: launch as a menu-bar app and auto-start the bridge.
+- `--all`: connect every available MIDI source.
+- `--quiet`: suppress per-message terminal logs.
+- `--show-realtime`: include MIDI clock and active sensing in logs.
+- `--self-test`: run mapping tests and exit.
+- `--list`: print available MIDI endpoints and exit.
+- `--volume-cc7`: experimental, map NTS-3 Master Volume to CC 7.
+- `--volume-cc11`: experimental, map NTS-3 Master Volume to CC 11.
+- `--play-toggle`: experimental, make Input Mute press alternate MIDI Start and Stop.
 
-## Output Modes
+## Confirmed Mappings
 
-Pair Mode is the default. It preserves 14-bit CC pairs:
+FX On/Off buttons select banks. If no FX is active, the active bank is Global. If one or more FX are active, X/Y/Depth route only to the most recently activated active FX bank.
 
-- incoming updates are coalesced on a short timer
-- each dirty mapped control is emitted as a back-to-back MSB/LSB pair
-- the MSB CC is sent first, followed immediately by the LSB CC
-- latest-value-wins coalescing avoids flooding DAW MIDI learn with raw X/Y pad traffic
+Switching banks latches the previous bank values. The app does not emit zero or reset values when leaving a bank. Pad touch release also holds the latest values.
 
-Trim Mode is enabled with `--trim`:
+| NTS-3 bank/control | Pro VS Mini target | MIDI |
+| --- | --- | --- |
+| Global X | Unmapped, vector X pending hardware research | none |
+| Global Y | Unmapped, vector Y pending hardware research | none |
+| Global Depth | Stored for debug only | none |
+| FX 1 X | Filter cutoff | CC 74 |
+| FX 1 Y | Filter resonance | CC 71 |
+| FX 1 Depth | Stored for debug only | none |
+| FX 2 X | Chorus rate | CC 92 |
+| FX 2 Y | Chorus amount | CC 91 |
+| FX 2 Depth | Stored for debug only | none |
+| FX 3 X | LFO 1 rate | CC 72 |
+| FX 3 Y | LFO 1 amount | CC 70 |
+| FX 3 Depth | Stored for debug only | none |
+| FX 4 X | LFO 2 rate | CC 73 |
+| FX 4 Y | LFO 2 amount | CC 28 |
+| FX 4 Depth | Stored for debug only | none |
+| Master Volume | Disabled by default | optional CC 7 or CC 11 |
+| Input Mute | Disabled by default | optional MIDI Start/Stop |
 
-- incoming MSB values are emitted on mapped MSB CCs
-- incoming LSB values are stored but not emitted
-- explicit resets and held values emit only the mapped MSB CC
+## Debug App
 
-## Output CC Layout
+`--ui` starts a menu-bar-only app. The status menu contains:
 
-| Output control | MSB | LSB |
-| --- | ---: | ---: |
-| Master Volume | 10 | 42 |
-| Global X | 11 | 43 |
-| Global Y | 12 | 44 |
-| Global Depth | 13 | 45 |
-| FX 1 X | 14 | 46 |
-| FX 1 Y | 15 | 47 |
-| FX 1 Depth | 16 | 48 |
-| FX 2 X | 17 | 49 |
-| FX 2 Y | 18 | 50 |
-| FX 2 Depth | 19 | 51 |
-| FX 3 X | 20 | 52 |
-| FX 3 Y | 21 | 53 |
-| FX 3 Depth | 22 | 54 |
-| FX 4 X | 23 | 55 |
-| FX 4 Y | 24 | 56 |
-| FX 4 Depth | 25 | 57 |
-
-## Menu-Bar App
-
-The `--ui` mode starts the CoreMIDI bridge as a menu-bar-only app. It does not appear in the Dock or Cmd-Tab switcher.
-
-The status menu includes:
-
-- `Debug`: open or reopen the mapping debugger window.
-- `Learn MIDI`: open the floating MIDI Learn popup.
+- `Debug`: open or reopen the Pro VS Mini debug window.
 - `Restart` or `Start`: restart or start the CoreMIDI bridge.
-- `Stop`: stop the CoreMIDI bridge.
+- `Stop`: stop the bridge.
 - `Quit`: stop the bridge and terminate the app.
 
-Closing the Debug window does not quit the app. Use the status menu to reopen Debug or quit.
+The Debug window shows the active bank, Pro VS parameter meters, global vector status, experimental volume/play state, recent outgoing MIDI, input touch/mute state, and latched 14-bit values.
 
-## Debug Window
+## Hardware Verification
 
-The window shows:
+1. Connect the NTS-3 and Pro VS Mini.
+2. Enable external MIDI CC receive on the Pro VS Mini.
+3. Run `swift run nts3-provs-mini-driver --list`.
+4. Confirm an NTS-3 source and a Pro VS destination appear. If names differ, use `--input "<source substring>"` and `--output "<destination substring>"`.
+5. Run `swift run nts3-provs-mini-driver --self-test` and confirm all tests pass.
+6. Start `swift run nts3-provs-mini-driver --ui --input "NTS-3" --output "PRO VS" --channel 1`.
+7. Open Debug from the menu-bar item.
+8. With no NTS-3 FX active, move the X/Y pad. Debug should update Global X/Y, and the Pro VS should not change vector mix.
+9. Turn on NTS-3 FX 1, touch the pad, and move X/Y. Pro VS filter cutoff/resonance should move.
+10. Turn on FX 2. X/Y should now move chorus rate/amount; FX 1 should stay latched.
+11. Turn off FX 2. X/Y should route back to FX 1 with no reset burst.
+12. Repeat for FX 3 and FX 4 to verify LFO 1 and LFO 2 targets.
+13. Release the pad after moving a mapped bank. The app should emit no zero/reset message.
+14. Optional: run with `--volume-cc7` or `--volume-cc11` and test whether Master Volume affects the Pro VS.
+15. Optional: run with `--play-toggle` and test whether Input Mute presses Start/Stop playback in the desired Pro VS sync mode.
 
-- a vertical Depth strip and rectangular X/Y pad
-- active FX indicators with distinct colors
-- current transformed X/Y output circles
-- frozen return-value rings
-- transformed Depth markers
-- numeric Global and FX output state
-- global freeze phase, FX mute freeze phase, current FX freeze target, Total FX Touch, Input Mute, and output mode
-
-## Learn MIDI Popup
-
-Open Learn MIDI from the status menu or press `Cmd+Option+L`. The popup is a floating panel configured for fullscreen DAW spaces.
-
-Targets are arranged as a compact table:
-
-- rows: Volume, Depth, X, Y
-- columns: Global, FX 1, FX 2, FX 3, FX 4
-
-Volume is available in the Global column. Each target cell shows its mapped CC pair.
-
-Selecting a target hides the popup, temporarily solos that mapped output, and sends a short CC pulse sequence for DAW MIDI learn. When the pulse sequence finishes, solo mode clears automatically. If the bridge is stopped, the popup remains visible but target controls are disabled.
-
-## DAW Setup
-
-1. Start `nts3-provs-mini-driver` and keep it running.
-2. Open the DAW MIDI settings.
-3. Enable Track and/or Remote for the input named `NTS-3 Pro VS Mini Driver`, or the custom `--virtual-name`.
-4. Use that virtual input for MIDI mapping or a MIDI track.
-
-For Ableton Live mapping, run `swift run nts3-provs-mini-driver --ui`, open Learn MIDI from the status item or `Cmd+Option+L`, and select the target you want Live to learn. Each target temporarily sends only that target's CC pair, which prevents Live from learning the wrong control during X/Y pad movement.
-
-## Actual Device Test Checklist
-
-1. Connect the NTS-3 over USB.
-2. Run `swift run nts3-provs-mini-driver --list` and confirm a source matching `NTS-3` appears. If the source has another name, add `--input "<source substring>"` to later commands.
-3. Run `swift run nts3-provs-mini-driver --self-test` and confirm it passes.
-4. Start the bridge with `swift run nts3-provs-mini-driver --ui` for menu-bar Debug/Learn MIDI checking, or `swift run nts3-provs-mini-driver` for terminal-only testing. Add `--trim` if testing 7-bit mode.
-5. In a DAW or MIDI monitor, listen to the virtual source `NTS-3 Pro VS Mini Driver`.
-6. Move Master Volume. Pair Mode should emit CC `10/42`; Trim Mode should emit CC `10` only.
-7. With no FX active, touch and move the X/Y pad. Global X/Y should emit CC `11/43` and `12/44`. Release the pad; Global X/Y should return to `0`. Depth should emit CC `13/45` and should not reset on pad release.
-8. While touching the X/Y pad, hold Input Mute, move to a value, then release either the pad or Input Mute. X/Y should return to the frozen value instead of `0`. Touch the pad again; live X/Y should emit while touched and return to the frozen value on release. Press and release Input Mute again to unfreeze; released X/Y should return to `0`.
-9. Turn FX 1 on. Global X/Y/Depth should emit `0`, then FX 1 X/Y/Depth should emit `0` on CC `14/46`, `15/47`, and `16/48`. Moving the pad should update FX 1, not Global.
-10. Turn on additional FX slots and verify their ranges: FX 2 `17/49` to `19/51`, FX 3 `20/52` to `22/54`, FX 4 `23/55` to `25/57`.
-11. The most recently activated FX is the current FX freeze target. With FX 1 and FX 2 active, FX 2 should be the target. Touch X/Y, hold Input Mute, move to a value, then release either the pad or Input Mute. FX 2 should return to its frozen X/Y on pad release; FX 1 should return to its own previous freeze value or `0`.
-12. Activate another FX slot and repeat Input Mute freeze. The newly activated FX should become the only slot whose freeze toggle changes. Previously frozen FX should stay parked on their stored values while the current target FX can still move live and return to its frozen value on release.
-13. Press and release Input Mute again while the same target FX is active. Only that target FX mute-freeze should clear, and released X/Y for that target should return to `0` unless that FX has its own FX Freeze CC active.
-14. Hold Input Mute for at least `0.7` seconds while FX Mode is active, then release it. All FX freeze states should clear, including stored freezes for inactive slots. Active FX should return to `0` when the pad is released.
-15. Turn a frozen FX slot off. Its X/Y/Depth should emit `0`, but its freeze toggle and frozen X/Y should be remembered unless the long-press clear gesture was used. Turn it back on; it should become the freeze target and immediately emit its stored frozen X/Y plus Depth `0`.
-16. When the last FX is off, the app returns to Global Mode; Global X/Y should resume the parked global frozen value if global freeze was active, otherwise `0`.
-17. With an FX active, send that FX Freeze value `127`, move the pad, then release it. That FX should move live if it is the current freeze target, then return to its captured frozen X/Y on release. Its Depth should also move live if it is the target. Non-target frozen FX should keep X/Y/Depth parked. Send Freeze `0` to clear the individual freeze.
-18. Watch the debug UI during the same checks: active FX indicators should glow, the target FX indicator should show the target marker, current X/Y circles should use each FX color, frozen return positions should show as rings in FX-related colors, and Depth markers should update for unfrozen FX plus the current target FX.
+Do not enable Global X/Y output until a safe vector mix MIDI path is confirmed on hardware.
 
 ## References
 
 - Mapping specification: [MAPPING_SPEC.md](MAPPING_SPEC.md)
-- Korg MIDI implementation download page: <https://www.korg.com/us/support/download/manual/0/934/5270/>
+- Korg NTS-3 MIDI implementation download page: <https://www.korg.com/us/support/download/manual/0/934/5270/>
