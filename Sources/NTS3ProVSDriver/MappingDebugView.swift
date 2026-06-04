@@ -345,9 +345,12 @@ private struct VectorPad: View {
 }
 
 private struct ValueField: Identifiable {
-    let id = UUID()
     var title: String
     var axis: NTS3ControlAxis
+
+    var id: NTS3ControlAxis {
+        axis
+    }
 }
 
 private struct ParameterMeter: View {
@@ -428,7 +431,12 @@ private struct FXEngineSelector: View {
     let onSelect: (FXEngineDisplay) -> Void
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
+            Text("Selected Effect:")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
             ForEach(FXEngineDisplay.allCases) { engine in
                 Button {
                     onSelect(engine)
@@ -437,15 +445,17 @@ private struct FXEngineSelector: View {
                         .font(.caption.weight(engine == activeEngine ? .semibold : .medium))
                         .foregroundStyle(engine == activeEngine ? Color.primary : Color.secondary.opacity(0.6))
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 4)
                         .padding(.vertical, 5)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .frame(maxWidth: .infinity)
             }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
