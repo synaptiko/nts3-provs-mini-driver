@@ -89,6 +89,18 @@ final class MIDIRemapper {
         }
     }
 
+    func send(packetBytesList: [[UInt8]]) {
+        outputQueue.async { [weak self] in
+            guard let self, self.destination != 0 else {
+                return
+            }
+
+            for bytes in packetBytesList {
+                self.send(packetBytes: bytes)
+            }
+        }
+    }
+
     private func createClient() throws {
         let status = MIDIClientCreateWithBlock(configuration.clientName as CFString, &client) { [weak self] notificationPointer in
             self?.handleMIDINotification(notificationPointer)

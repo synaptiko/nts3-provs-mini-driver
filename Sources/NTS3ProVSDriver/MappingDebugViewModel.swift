@@ -81,6 +81,33 @@ final class MappingDebugViewModel: ObservableObject {
         appendStatus(message)
     }
 
+    func select(bank: MappingBank) {
+        guard let transformer else {
+            return
+        }
+
+        remapper?.send(packetBytesList: transformer.select(bank: bank))
+    }
+
+    func setValue(bank: MappingBank, axis: NTS3ControlAxis, midiValue: Int) {
+        guard let transformer else {
+            return
+        }
+
+        let value = NTS3CC14Value(midi7BitValue: midiValue)
+        remapper?.send(packetBytesList: transformer.setValue(bank: bank, axis: axis, value: value))
+    }
+
+    func setXY(bank: MappingBank, normalizedX: Double, normalizedY: Double) {
+        guard let transformer else {
+            return
+        }
+
+        let x = NTS3CC14Value(normalized: normalizedX)
+        let y = NTS3CC14Value(normalized: normalizedY)
+        remapper?.send(packetBytesList: transformer.setXY(bank: bank, x: x, y: y))
+    }
+
     private func appendStatus(_ message: String) {
         statusMessages.append(message)
         if statusMessages.count > 8 {

@@ -7,7 +7,7 @@ struct MappingDebugView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            DashboardGrid(state: model.mappingState)
+            DashboardGrid(model: model)
         }
         .frame(minWidth: 1120, minHeight: 620)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -59,7 +59,11 @@ struct MappingDebugView: View {
 }
 
 private struct DashboardGrid: View {
-    let state: ProVSMappingSnapshot
+    @ObservedObject var model: MappingDebugViewModel
+
+    private var state: ProVSMappingSnapshot {
+        model.mappingState
+    }
 
     private let columns = [
         GridItem(.flexible(), spacing: 14),
@@ -69,9 +73,17 @@ private struct DashboardGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 14) {
-            XYPadCard(state: state)
-            GlobalCard(bank: state.bank(.global))
-            EffectCard(bank: state.bank(.fx(1)))
+            XYPadCard(model: model, state: state)
+            GlobalCard(
+                bank: state.bank(.global),
+                onSelect: { model.select(bank: .global) },
+                onValueChange: { axis, value in model.setValue(bank: .global, axis: axis, midiValue: value) }
+            )
+            EffectCard(
+                bank: state.bank(.fx(1)),
+                onSelect: { model.select(bank: .fx(1)) },
+                onValueChange: { axis, value in model.setValue(bank: .fx(1), axis: axis, midiValue: value) }
+            )
             ParameterCard(
                 title: "Filter",
                 bank: state.bank(.fx(2)),
@@ -79,7 +91,9 @@ private struct DashboardGrid: View {
                 fields: [
                     ValueField(title: "Cutoff", axis: .x),
                     ValueField(title: "Resonance", axis: .y)
-                ]
+                ],
+                onSelect: { model.select(bank: .fx(2)) },
+                onValueChange: { axis, value in model.setValue(bank: .fx(2), axis: axis, midiValue: value) }
             )
             ParameterCard(
                 title: "LFO 1",
@@ -88,7 +102,9 @@ private struct DashboardGrid: View {
                 fields: [
                     ValueField(title: "Rate", axis: .x),
                     ValueField(title: "Amount", axis: .y)
-                ]
+                ],
+                onSelect: { model.select(bank: .fx(3)) },
+                onValueChange: { axis, value in model.setValue(bank: .fx(3), axis: axis, midiValue: value) }
             )
             ParameterCard(
                 title: "LFO 2",
@@ -97,7 +113,9 @@ private struct DashboardGrid: View {
                 fields: [
                     ValueField(title: "Rate", axis: .x),
                     ValueField(title: "Amount", axis: .y)
-                ]
+                ],
+                onSelect: { model.select(bank: .fx(4)) },
+                onValueChange: { axis, value in model.setValue(bank: .fx(4), axis: axis, midiValue: value) }
             )
         }
         .padding(18)
@@ -106,6 +124,7 @@ private struct DashboardGrid: View {
 }
 
 private struct XYPadCard: View {
+    @ObservedObject var model: MappingDebugViewModel
     let state: ProVSMappingSnapshot
 
     private var activeBank: ProVSBankSnapshot {
@@ -117,9 +136,12 @@ private struct XYPadCard: View {
             title: "X/Y Pad",
             subtitle: activeBank.bank.displayName,
             color: .accentColor,
-            isCurrent: true
+            isCurrent: true,
+            onSelect: {}
         ) {
-            VectorPad(valueX: activeBank.x, valueY: activeBank.y)
+            VectorPad(valueX: activeBank.x, valueY: activeBank.y) { x, y in
+                model.setXY(bank: activeBank.bank, normalizedX: x, normalizedY: y)
+            }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
@@ -127,6 +149,8 @@ private struct XYPadCard: View {
 
 private struct GlobalCard: View {
     let bank: ProVSBankSnapshot
+    let onSelect: () -> Void
+    let onValueChange: (NTS3ControlAxis, Int) -> Void
 
     var body: some View {
         ParameterCard(
@@ -136,13 +160,17 @@ private struct GlobalCard: View {
             fields: [
                 ValueField(title: "Modulation", axis: .x),
                 ValueField(title: "Portamento", axis: .y)
-            ]
+            ],
+            onSelect: onSelect,
+            onValueChange: onValueChange
         )
     }
 }
 
 private struct EffectCard: View {
     let bank: ProVSBankSnapshot
+    let onSelect: () -> Void
+    let onValueChange: (NTS3ControlAxis, Int) -> Void
 
     private var engine: FXEngineDisplay {
         FXEngineDisplay(bank: bank)
@@ -156,7 +184,9 @@ private struct EffectCard: View {
             fields: [
                 ValueField(title: engine.xLabel, axis: .x),
                 ValueField(title: engine.yLabel, axis: .y)
-            ]
+            ],
+            onSelect: onSelect,
+            onValueChange: onValueChange
         )
     }
 }
@@ -166,13 +196,16 @@ private struct ParameterCard: View {
     let bank: ProVSBankSnapshot
     let color: Color
     let fields: [ValueField]
+    let onSelect: () -> Void
+    let onValueChange: (NTS3ControlAxis, Int) -> Void
 
     var body: some View {
         CardShell(
             title: title,
             subtitle: bank.bank.displayName,
             color: color,
-            isCurrent: bank.isCurrent
+            isCurrent: bank.isCurrent,
+            onSelect: onSelect
         ) {
             VStack(spacing: 14) {
                 ForEach(fields) { field in
@@ -181,7 +214,11 @@ private struct ParameterCard: View {
                         value: bank.value(for: field.axis),
                         target: bank.target(for: field.axis),
                         outputValue: bank.outputValue(for: field.axis),
-                        color: color
+                        color: color,
+                        onValueChange: { value in
+                            onSelect()
+                            onValueChange(field.axis, value)
+                        }
                     )
                 }
                 Spacer(minLength: 0)
@@ -195,6 +232,7 @@ private struct CardShell<Content: View>: View {
     let subtitle: String
     let color: Color
     let isCurrent: Bool
+    let onSelect: () -> Void
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -222,12 +260,15 @@ private struct CardShell<Content: View>: View {
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isCurrent ? color.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: isCurrent ? 1.5 : 1)
         }
+        .contentShape(RoundedRectangle(cornerRadius: 8))
+        .onTapGesture(perform: onSelect)
     }
 }
 
 private struct VectorPad: View {
     let valueX: NTS3CC14Value
     let valueY: NTS3CC14Value
+    var onChange: (Double, Double) -> Void = { _, _ in }
 
     var body: some View {
         GeometryReader { geometry in
@@ -248,10 +289,23 @@ private struct VectorPad: View {
                 .stroke(Color.primary.opacity(0.16), lineWidth: 1)
                 Circle()
                     .fill(Color.accentColor.opacity(0.75))
-                    .frame(width: 16, height: 16)
+                    .frame(width: 18, height: 18)
                     .position(x: x, y: y)
             }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let normalizedX = clamp(Double(gesture.location.x / max(geometry.size.width, 1)))
+                        let normalizedY = clamp(Double(1.0 - gesture.location.y / max(geometry.size.height, 1)))
+                        onChange(normalizedX, normalizedY)
+                    }
+            )
         }
+    }
+
+    private func clamp(_ value: Double) -> Double {
+        max(0.0, min(value, 1.0))
     }
 }
 
@@ -267,25 +321,26 @@ private struct ParameterMeter: View {
     let target: ProVSControlTarget?
     let outputValue: Int?
     let color: Color
+    let onValueChange: (Int) -> Void
 
     private var midiValue: Int {
         outputValue ?? value.midi7BitValue
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(1)
-                Spacer()
-                Text(target.map { "CC \($0.parameter.controller)" } ?? "Unmapped")
-                    .font(.caption)
-                    .foregroundStyle(target == nil ? .secondary : .primary)
-                    .lineLimit(1)
-            }
+        GeometryReader { geometry in
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                    Spacer()
+                    Text(target.map { "CC \($0.parameter.controller)" } ?? "Unmapped")
+                        .font(.caption)
+                        .foregroundStyle(target == nil ? .secondary : .primary)
+                        .lineLimit(1)
+                }
 
-            GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.primary.opacity(0.08))
@@ -293,17 +348,27 @@ private struct ParameterMeter: View {
                         .fill(target == nil ? Color.secondary.opacity(0.35) : color.opacity(0.75))
                         .frame(width: max(4, geometry.size.width * CGFloat(midiValue) / 127.0))
                 }
-            }
-            .frame(height: 8)
+                .frame(height: 8)
 
-            HStack {
-                Text("MIDI \(midiValue)")
-                Spacer()
-                Text("Display \(value.proVSDisplayValue)")
+                HStack {
+                    Text("MIDI \(midiValue)")
+                    Spacer()
+                    Text("Display \(value.proVSDisplayValue)")
+                }
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(.secondary)
             }
-            .font(.system(.caption2, design: .monospaced))
-            .foregroundStyle(.secondary)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let fraction = max(0.0, min(gesture.location.x / max(geometry.size.width, 1), 1.0))
+                        onValueChange(Int((fraction * 127.0).rounded()))
+                    }
+            )
         }
+        .frame(height: 66)
     }
 }
 

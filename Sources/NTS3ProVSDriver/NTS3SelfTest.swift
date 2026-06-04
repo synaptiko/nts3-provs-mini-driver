@@ -14,7 +14,8 @@ enum NTS3SelfTest {
             ("unmapped depth is stored", testUnmappedDepthIsStored),
             ("volume experimental flags", testVolumeExperimentalFlags),
             ("input mute play toggle is edge detected", testInputMutePlayToggleIsEdgeDetected),
-            ("transformer channel and running status", testTransformerChannelAndRunningStatus)
+            ("transformer channel and running status", testTransformerChannelAndRunningStatus),
+            ("manual debug interactions", testManualDebugInteractions)
         ]
 
         var failureCount = 0
@@ -213,6 +214,40 @@ enum NTS3SelfTest {
         expect(transformer.transform(packetBytes: [0xB0, 102, 127, 106, 127]), [], "switches should emit nothing", &failures)
         expect(transformer.transform(packetBytes: [0xB0, 12, 64]), [], "FX1 X should queue", &failures)
         expect(transformer.flushPendingOutputs(), [[0xB3, 92, 64]], "flush should use output channel 4", &failures)
+        return failures
+    }
+
+    private static func testManualDebugInteractions() -> [String] {
+        let transformer = NTS3MappingTransformer(outputChannel: 2)
+        var failures: [String] = []
+
+        expect(transformer.select(bank: .fx(2)), [], "manual select should not emit", &failures)
+        expect(
+            transformer.setValue(bank: .fx(2), axis: .x, value: NTS3CC14Value(midi7BitValue: 77)),
+            [[0xB1, 74, 77]],
+            "manual filter cutoff",
+            &failures
+        )
+        expect(
+            transformer.setXY(
+                bank: .fx(1),
+                x: NTS3CC14Value(midi7BitValue: 33),
+                y: NTS3CC14Value(midi7BitValue: 44)
+            ),
+            [[0xB1, 92, 33], [0xB1, 91, 44]],
+            "manual effects XY",
+            &failures
+        )
+        expect(
+            transformer.setXY(
+                bank: .global,
+                x: NTS3CC14Value(midi7BitValue: 10),
+                y: NTS3CC14Value(midi7BitValue: 20)
+            ),
+            [[0xB1, 1, 10], [0xB1, 5, 20]],
+            "manual global XY",
+            &failures
+        )
         return failures
     }
 

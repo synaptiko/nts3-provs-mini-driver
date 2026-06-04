@@ -40,6 +40,20 @@ struct NTS3CC14Value: Equatable {
         self.lsb = clamped & 0x7F
     }
 
+    init(midi7BitValue: Int) {
+        let clamped = Self.clamp7Bit(midi7BitValue)
+        if clamped == 127 {
+            self.init(combined: 16_383)
+        } else {
+            self.init(combined: clamped << 7)
+        }
+    }
+
+    init(normalized: Double) {
+        let clamped = max(0.0, min(normalized, 1.0))
+        self.init(combined: Int((clamped * 16_383.0).rounded()))
+    }
+
     var combined: Int {
         (msb << 7) | lsb
     }
@@ -478,6 +492,39 @@ final class ProVSMappingEngine {
         return output
     }
 
+    func select(bank: MappingBank) -> [MIDIOutputMessage] {
+        switch bank {
+        case .global:
+            activeFXSlots.removeAll()
+            fxActivationOrder.removeAll()
+        case .fx(let slot):
+            activeFXSlots.insert(slot)
+            fxActivationOrder.removeAll { $0 == slot }
+            fxActivationOrder.append(slot)
+        }
+
+        publishState()
+        return []
+    }
+
+    func setValue(bank: MappingBank, axis: NTS3ControlAxis, value: NTS3CC14Value) -> [MIDIOutputMessage] {
+        update(bank: bank, axis: axis, value: value)
+        queue(bank: bank, axis: axis)
+        let output = flushPendingOutputs()
+        publishState()
+        return output
+    }
+
+    func setXY(bank: MappingBank, x: NTS3CC14Value, y: NTS3CC14Value) -> [MIDIOutputMessage] {
+        update(bank: bank, axis: .x, value: x)
+        update(bank: bank, axis: .y, value: y)
+        queue(bank: bank, axis: .x)
+        queue(bank: bank, axis: .y)
+        let output = flushPendingOutputs()
+        publishState()
+        return output
+    }
+
     func flushPendingOutputs() -> [MIDIOutputMessage] {
         let orderedTargets = pendingOutputOrder
         let outputs = pendingOutputs
@@ -576,8 +623,24 @@ final class ProVSMappingEngine {
         banks[currentBank] = state
     }
 
+    private func update(bank: MappingBank, axis: NTS3ControlAxis, value: NTS3CC14Value) {
+        var state = banks[bank] ?? BankState()
+        switch axis {
+        case .x:
+            state.x = value
+        case .y:
+            state.y = value
+        case .depth:
+            state.depth = value
+        }
+        banks[bank] = state
+    }
+
     private func queueCurrentBank(axis: NTS3ControlAxis) {
-        let bank = currentBank
+        queue(bank: currentBank, axis: axis)
+    }
+
+    private func queue(bank: MappingBank, axis: NTS3ControlAxis) {
         guard let target = Self.target(for: bank, axis: axis),
               let value = value(for: axis, in: bank) else {
             return
@@ -778,5 +841,26 @@ final class NTS3MappingTransformer: MIDITransformer {
         defer { lock.unlock() }
 
         return engine.flushPendingOutputs().map(\.bytes)
+    }
+
+    func select(bank: MappingBank) -> [[UInt8]] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return engine.select(bank: bank).map(\.bytes)
+    }
+
+    func setValue(bank: MappingBank, axis: NTS3ControlAxis, value: NTS3CC14Value) -> [[UInt8]] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return engine.setValue(bank: bank, axis: axis, value: value).map(\.bytes)
+    }
+
+    func setXY(bank: MappingBank, x: NTS3CC14Value, y: NTS3CC14Value) -> [[UInt8]] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return engine.setXY(bank: bank, x: x, y: y).map(\.bytes)
     }
 }
