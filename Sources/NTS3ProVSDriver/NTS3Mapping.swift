@@ -66,12 +66,12 @@ struct NTS3CC14Value: Equatable {
         max(0, min(127, combined >> 7))
     }
 
-    var proVSDisplayValue: Int {
-        max(0, min(99, Int((normalized * 99.0).rounded())))
+    var percentValue: Int {
+        max(0, min(100, Int((normalized * 100.0).rounded())))
     }
 
     var debugText: String {
-        "\(combined) -> MIDI \(midi7BitValue) / display \(proVSDisplayValue)"
+        "\(combined) -> MIDI \(midi7BitValue) / \(percentValue)%"
     }
 
     mutating func update(part: NTS3CCPart, value: Int) {

@@ -62,7 +62,7 @@ enum NTS3SelfTest {
         expect(NTS3CC14Value(combined: 0).midi7BitValue, 0, "minimum MIDI value", &failures)
         expect(NTS3CC14Value(combined: 16_383).midi7BitValue, 127, "maximum MIDI value", &failures)
         expect(NTS3CC14Value(combined: 8_192).midi7BitValue, 64, "midpoint MIDI value", &failures)
-        expect(NTS3CC14Value(combined: 16_383).proVSDisplayValue, 99, "maximum display projection", &failures)
+        expect(NTS3CC14Value(combined: 16_383).percentValue, 100, "maximum percent projection", &failures)
         return failures
     }
 

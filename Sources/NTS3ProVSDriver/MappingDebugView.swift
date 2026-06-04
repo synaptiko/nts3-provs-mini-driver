@@ -407,7 +407,7 @@ private struct ParameterMeter: View {
                 HStack {
                     Text("MIDI \(midiValue)")
                     Spacer()
-                    Text("Display \(value.proVSDisplayValue)")
+                    Text("\(value.percentValue)%")
                 }
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
