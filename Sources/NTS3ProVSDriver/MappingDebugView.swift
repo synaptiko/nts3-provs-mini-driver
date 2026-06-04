@@ -156,7 +156,7 @@ private struct GlobalVectorPanel: View {
             HStack {
                 Text("Global Vector")
                     .font(.headline)
-                StatusPill(title: "Unmapped", color: .secondary)
+                StatusPill(title: "Mod + Portamento", color: .accentColor)
                 Spacer()
             }
 
@@ -165,9 +165,9 @@ private struct GlobalVectorPanel: View {
                     .frame(width: 230, height: 150)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    AxisReadout(axis: .x, value: global.x, target: nil)
-                    AxisReadout(axis: .y, value: global.y, target: nil)
-                    AxisReadout(axis: .depth, value: global.depth, target: nil)
+                    AxisReadout(axis: .x, value: global.x, target: global.target(for: .x))
+                    AxisReadout(axis: .y, value: global.y, target: global.target(for: .y))
+                    AxisReadout(axis: .depth, value: global.depth, target: global.target(for: .depth))
                 }
             }
         }

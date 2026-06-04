@@ -5,12 +5,13 @@ enum NTS3SelfTest {
         let tests: [(String, () -> [String])] = [
             ("NTS-3 CC parser", testParserRunningStatusAndIgnoresNonCC),
             ("14-bit scaling", test14BitScaling),
-            ("Global values latch without vector output", testGlobalValuesLatchWithoutVectorOutput),
+            ("Global modulation and portamento mappings", testGlobalModulationAndPortamentoMappings),
             ("confirmed FX mappings", testConfirmedFXMappings),
+            ("FX2 depth selects FX engine", testFX2DepthSelectsFXEngine),
             ("last activated FX wins", testLastActivatedFXWins),
             ("bank switching emits no reset", testBankSwitchingEmitsNoReset),
             ("touch release latches values", testTouchReleaseLatchesValues),
-            ("depth is stored but unmapped", testDepthIsStoredButUnmapped),
+            ("unmapped depth is stored", testUnmappedDepthIsStored),
             ("volume experimental flags", testVolumeExperimentalFlags),
             ("input mute play toggle is edge detected", testInputMutePlayToggleIsEdgeDetected),
             ("transformer channel and running status", testTransformerChannelAndRunningStatus)
@@ -64,13 +65,13 @@ enum NTS3SelfTest {
         return failures
     }
 
-    private static func testGlobalValuesLatchWithoutVectorOutput() -> [String] {
+    private static func testGlobalModulationAndPortamentoMappings() -> [String] {
         let engine = ProVSMappingEngine(outputChannel: 1)
         var failures: [String] = []
 
         _ = send(engine, cc(102, 127))
-        expect(outputs(send(engine, cc(12, 64))), [], "global X should be unmapped", &failures)
-        expect(outputs(send(engine, cc(13, 32))), [], "global Y should be unmapped", &failures)
+        expect(outputs(send(engine, cc(12, 64))), ["cc ch1 1:64"], "global X -> modulation", &failures)
+        expect(outputs(send(engine, cc(13, 32))), ["cc ch1 5:32"], "global Y -> portamento", &failures)
         expect(engine.snapshot.activeBank, .global, "active bank should remain global", &failures)
         let global = bank(.global, in: engine.snapshot)
         expect(global?.x.msb, 64, "global X should latch", &failures)
@@ -90,6 +91,7 @@ enum NTS3SelfTest {
         _ = send(engine, cc(110, 127))
         expect(outputs(send(engine, cc(12, 20))), ["cc ch1 92:20"], "FX2 X -> chorus rate", &failures)
         expect(outputs(send(engine, cc(13, 40))), ["cc ch1 91:40"], "FX2 Y -> chorus amount", &failures)
+        expect(outputs(send(engine, cc(14, 20))), ["cc ch1 9:21"], "FX2 Depth -> chorus engine", &failures)
 
         _ = send(engine, cc(114, 127))
         expect(outputs(send(engine, cc(12, 50))), ["cc ch1 72:50"], "FX3 X -> LFO1 rate", &failures)
@@ -98,6 +100,23 @@ enum NTS3SelfTest {
         _ = send(engine, cc(118, 127))
         expect(outputs(send(engine, cc(12, 70))), ["cc ch1 73:70"], "FX4 X -> LFO2 rate", &failures)
         expect(outputs(send(engine, cc(13, 80))), ["cc ch1 28:80"], "FX4 Y -> LFO2 amount", &failures)
+        return failures
+    }
+
+    private static func testFX2DepthSelectsFXEngine() -> [String] {
+        let engine = ProVSMappingEngine(outputChannel: 1)
+        var failures: [String] = []
+
+        _ = send(engine, cc(110, 127))
+        expect(outputs(send(engine, cc(14, 0))), ["cc ch1 9:21"], "lowest depth should select chorus", &failures)
+        expect(outputs(send(engine, cc(14, 44))), [], "hysteresis should keep chorus near ensemble split", &failures)
+        expect(outputs(send(engine, cc(14, 45))), ["cc ch1 9:64"], "depth above hysteresis should select ensemble", &failures)
+        expect(outputs(send(engine, cc(14, 83))), [], "hysteresis should keep ensemble near reverb split", &failures)
+        expect(outputs(send(engine, cc(14, 87))), ["cc ch1 9:106"], "depth above hysteresis should select reverb", &failures)
+        expect(outputs(send(engine, cc(14, 83))), [], "hysteresis should keep reverb near ensemble split", &failures)
+        expect(outputs(send(engine, cc(14, 82))), ["cc ch1 9:64"], "depth below hysteresis should return to ensemble", &failures)
+        expect(outputs(send(engine, cc(14, 41))), [], "hysteresis should keep ensemble near chorus split", &failures)
+        expect(outputs(send(engine, cc(14, 40))), ["cc ch1 9:21"], "depth below hysteresis should return to chorus", &failures)
         return failures
     }
 
@@ -143,7 +162,7 @@ enum NTS3SelfTest {
         return failures
     }
 
-    private static func testDepthIsStoredButUnmapped() -> [String] {
+    private static func testUnmappedDepthIsStored() -> [String] {
         let engine = ProVSMappingEngine(outputChannel: 1)
         var failures: [String] = []
 

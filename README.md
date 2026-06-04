@@ -4,7 +4,7 @@ macOS menu-bar CoreMIDI bridge for controlling a Behringer Pro VS Mini from a Ko
 
 The app listens to the NTS-3, keeps NTS-3 pad values internally as 14-bit controls, converts confirmed Pro VS targets to 7-bit MIDI CC, and sends directly to a matched Pro VS Mini MIDI destination. It does not create a DAW virtual source.
 
-Global vector X/Y is intentionally unmapped for now. The Pro VS Mini manuals do not document a safe realtime joystick/vector X/Y MIDI target, so that path is left for hardware experiments.
+True Pro VS Mini vector mix X/Y is intentionally not implemented for now. Global X/Y instead use documented performance targets: Modulation and Portamento time.
 
 ## Requirements
 
@@ -81,15 +81,15 @@ Switching banks latches the previous bank values. The app does not emit zero or 
 
 | NTS-3 bank/control | Pro VS Mini target | MIDI |
 | --- | --- | --- |
-| Global X | Unmapped, vector X pending hardware research | none |
-| Global Y | Unmapped, vector Y pending hardware research | none |
+| Global X | Modulation | CC 1 |
+| Global Y | Portamento time | CC 5 |
 | Global Depth | Stored for debug only | none |
 | FX 1 X | Filter cutoff | CC 74 |
 | FX 1 Y | Filter resonance | CC 71 |
 | FX 1 Depth | Stored for debug only | none |
 | FX 2 X | Chorus rate | CC 92 |
 | FX 2 Y | Chorus amount | CC 91 |
-| FX 2 Depth | Stored for debug only | none |
+| FX 2 Depth | FX engine select: Chorus, Ensemble, Reverb | CC 9 |
 | FX 3 X | LFO 1 rate | CC 72 |
 | FX 3 Y | LFO 1 amount | CC 70 |
 | FX 3 Depth | Stored for debug only | none |
@@ -119,16 +119,16 @@ The Debug window shows the active bank, Pro VS parameter meters, global vector s
 5. Run `swift run nts3-provs-mini-driver --self-test` and confirm all tests pass.
 6. Start `swift run nts3-provs-mini-driver --ui --input "NTS-3" --output "PRO VS" --channel 1`.
 7. Open Debug from the menu-bar item.
-8. With no NTS-3 FX active, move the X/Y pad. Debug should update Global X/Y, and the Pro VS should not change vector mix.
+8. With no NTS-3 FX active, move the X/Y pad. Global X should send Modulation CC `1`, and Global Y should send Portamento time CC `5`.
 9. Turn on NTS-3 FX 1, touch the pad, and move X/Y. Pro VS filter cutoff/resonance should move.
-10. Turn on FX 2. X/Y should now move chorus rate/amount; FX 1 should stay latched.
+10. Turn on FX 2. X/Y should now move chorus rate/amount; FX 1 should stay latched. Move Depth through low/mid/high areas and confirm CC `9` selects Chorus, Ensemble, and Reverb.
 11. Turn off FX 2. X/Y should route back to FX 1 with no reset burst.
 12. Repeat for FX 3 and FX 4 to verify LFO 1 and LFO 2 targets.
 13. Release the pad after moving a mapped bank. The app should emit no zero/reset message.
 14. Optional: run with `--volume-cc7` or `--volume-cc11` and test whether Master Volume affects the Pro VS.
 15. Optional: run with `--play-toggle` and test whether Input Mute presses Start/Stop playback in the desired Pro VS sync mode.
 
-Do not enable Global X/Y output until a safe vector mix MIDI path is confirmed on hardware.
+Do not map Global X/Y to true vector mix until a safe vector mix MIDI path is confirmed on hardware.
 
 ## References
 

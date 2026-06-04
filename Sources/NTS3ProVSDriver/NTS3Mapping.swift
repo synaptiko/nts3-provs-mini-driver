@@ -108,6 +108,9 @@ enum MappingBank: Equatable, Hashable, Identifiable {
 }
 
 enum ProVSParameter: String, CaseIterable, Equatable, Hashable, Identifiable {
+    case modulation
+    case portamentoTime
+    case fxEngineSelect
     case filterCutoff
     case filterResonance
     case chorusRate
@@ -123,6 +126,12 @@ enum ProVSParameter: String, CaseIterable, Equatable, Hashable, Identifiable {
 
     var displayName: String {
         switch self {
+        case .modulation:
+            return "Modulation"
+        case .portamentoTime:
+            return "Portamento Time"
+        case .fxEngineSelect:
+            return "FX Engine Select"
         case .filterCutoff:
             return "Filter Cutoff"
         case .filterResonance:
@@ -148,6 +157,12 @@ enum ProVSParameter: String, CaseIterable, Equatable, Hashable, Identifiable {
 
     var controller: Int {
         switch self {
+        case .modulation:
+            return 1
+        case .portamentoTime:
+            return 5
+        case .fxEngineSelect:
+            return 9
         case .filterCutoff:
             return 74
         case .filterResonance:
@@ -376,6 +391,7 @@ final class ProVSMappingEngine {
     }
 
     private static let recentOutputLimit = 10
+    private static let fxEngineHysteresis = 2
 
     private let outputChannel: Int
     private let experimentalOptions: ProVSExperimentalOptions
@@ -557,7 +573,7 @@ final class ProVSMappingEngine {
             return
         }
 
-        queue(target: target, value: value.midi7BitValue)
+        queue(target: target, value: outputValue(for: target, value: value))
     }
 
     private func queueVolumeIfEnabled() {
@@ -592,6 +608,33 @@ final class ProVSMappingEngine {
         )
         pendingOutputs[target] = message
         rememberOutput(message.snapshot)
+    }
+
+    private func outputValue(for target: ProVSControlTarget, value: NTS3CC14Value) -> Int {
+        guard target.parameter == .fxEngineSelect else {
+            return value.midi7BitValue
+        }
+
+        return fxEngineValue(for: value.midi7BitValue, previousValue: lastQueuedValues[target])
+    }
+
+    private func fxEngineValue(for rawValue: Int, previousValue: Int?) -> Int {
+        switch previousValue {
+        case 21? where rawValue <= 42 + Self.fxEngineHysteresis:
+            return 21
+        case 64? where rawValue >= 43 - Self.fxEngineHysteresis && rawValue <= 84 + Self.fxEngineHysteresis:
+            return 64
+        case 106? where rawValue >= 85 - Self.fxEngineHysteresis:
+            return 106
+        default:
+            if rawValue <= 42 {
+                return 21
+            }
+            if rawValue <= 84 {
+                return 64
+            }
+            return 106
+        }
     }
 
     private func value(for axis: NTS3ControlAxis, in bank: MappingBank) -> NTS3CC14Value? {
@@ -633,6 +676,10 @@ final class ProVSMappingEngine {
 
     static func target(for bank: MappingBank, axis: NTS3ControlAxis) -> ProVSControlTarget? {
         switch (bank, axis) {
+        case (.global, .x):
+            return ProVSControlTarget(bank: bank, axis: axis, parameter: .modulation)
+        case (.global, .y):
+            return ProVSControlTarget(bank: bank, axis: axis, parameter: .portamentoTime)
         case (.fx(1), .x):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .filterCutoff)
         case (.fx(1), .y):
@@ -641,6 +688,8 @@ final class ProVSMappingEngine {
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .chorusRate)
         case (.fx(2), .y):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .chorusAmount)
+        case (.fx(2), .depth):
+            return ProVSControlTarget(bank: bank, axis: axis, parameter: .fxEngineSelect)
         case (.fx(3), .x):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .lfo1Rate)
         case (.fx(3), .y):
