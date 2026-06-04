@@ -65,7 +65,7 @@ Total FX Touch gates X/Y input:
 - Touch `127`: incoming X/Y values update the current bank and may emit mapped output.
 - Touch `0`: incoming X/Y values are ignored, and no reset is emitted.
 
-Depth is not touch-gated. Depth values are stored for the current bank. FX 2 Depth has a mapped target; other depth targets are debug-only.
+Depth is not touch-gated. Depth values are stored for the current bank. FX 1 Depth has a mapped target; other depth targets are debug-only.
 
 ## Confirmed Pro VS Mini Targets
 
@@ -73,17 +73,17 @@ Depth is not touch-gated. Depth values are stored for the current bank. FX 2 Dep
 | --- | --- | --- |
 | Global X | Modulation | CC 1 |
 | Global Y | Portamento time | CC 5 |
-| FX 1 X | Filter cutoff | CC 74 |
-| FX 1 Y | Filter resonance | CC 71 |
-| FX 2 X | Chorus rate | CC 92 |
-| FX 2 Y | Chorus amount | CC 91 |
-| FX 2 Depth | FX engine select | CC 9 |
+| FX 1 X | Chorus/Ensemble/Reverb primary control | CC 92 |
+| FX 1 Y | Chorus/Ensemble/Reverb secondary control | CC 91 |
+| FX 1 Depth | FX engine select | CC 9 |
+| FX 2 X | Filter cutoff | CC 74 |
+| FX 2 Y | Filter resonance | CC 71 |
 | FX 3 X | LFO 1 rate | CC 72 |
 | FX 3 Y | LFO 1 amount | CC 70 |
 | FX 4 X | LFO 2 rate | CC 73 |
 | FX 4 Y | LFO 2 amount | CC 28 |
 
-FX 2 Depth is quantized to three representative CC 9 values:
+FX 1 Depth is quantized to three representative CC 9 values:
 
 | NTS-3 Depth 7-bit area | Pro VS FX engine | Emitted value |
 | --- | --- | ---: |
@@ -93,7 +93,7 @@ FX 2 Depth is quantized to three representative CC 9 values:
 
 The engine selector uses a two-value hysteresis around the `42/43` and `84/85` boundaries, so small depth jitter near a split does not flicker between engines.
 
-FX 1, FX 3, FX 4, and Global Depth values are currently stored but unmapped.
+FX 2, FX 3, FX 4, and Global Depth values are currently stored but unmapped.
 
 ## Intentionally Unmapped
 
@@ -141,7 +141,7 @@ The debug snapshot exposes:
 - 14-bit to 7-bit scaling
 - Global X/Y modulation and portamento output
 - confirmed FX target mappings
-- FX 2 Depth FX engine selection and hysteresis
+- FX 1 Depth FX engine selection and hysteresis
 - last activated FX wins
 - bank switching emits no reset
 - touch release latches values

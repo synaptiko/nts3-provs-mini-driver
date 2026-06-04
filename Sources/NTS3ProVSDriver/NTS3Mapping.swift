@@ -691,15 +691,15 @@ final class ProVSMappingEngine {
         case (.global, .y):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .portamentoTime)
         case (.fx(1), .x):
-            return ProVSControlTarget(bank: bank, axis: axis, parameter: .filterCutoff)
-        case (.fx(1), .y):
-            return ProVSControlTarget(bank: bank, axis: axis, parameter: .filterResonance)
-        case (.fx(2), .x):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .chorusRate)
-        case (.fx(2), .y):
+        case (.fx(1), .y):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .chorusAmount)
-        case (.fx(2), .depth):
+        case (.fx(1), .depth):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .fxEngineSelect)
+        case (.fx(2), .x):
+            return ProVSControlTarget(bank: bank, axis: axis, parameter: .filterCutoff)
+        case (.fx(2), .y):
+            return ProVSControlTarget(bank: bank, axis: axis, parameter: .filterResonance)
         case (.fx(3), .x):
             return ProVSControlTarget(bank: bank, axis: axis, parameter: .lfo1Rate)
         case (.fx(3), .y):

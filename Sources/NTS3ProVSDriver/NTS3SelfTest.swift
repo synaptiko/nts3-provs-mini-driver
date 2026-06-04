@@ -7,7 +7,7 @@ enum NTS3SelfTest {
             ("14-bit scaling", test14BitScaling),
             ("Global modulation and portamento mappings", testGlobalModulationAndPortamentoMappings),
             ("confirmed FX mappings", testConfirmedFXMappings),
-            ("FX2 depth selects FX engine", testFX2DepthSelectsFXEngine),
+            ("FX1 depth selects FX engine", testFX1DepthSelectsFXEngine),
             ("last activated FX wins", testLastActivatedFXWins),
             ("bank switching emits no reset", testBankSwitchingEmitsNoReset),
             ("touch release latches values", testTouchReleaseLatchesValues),
@@ -85,13 +85,13 @@ enum NTS3SelfTest {
 
         _ = send(engine, cc(102, 127))
         _ = send(engine, cc(106, 127))
-        expect(outputs(send(engine, cc(12, 64))), ["cc ch1 74:64"], "FX1 X -> cutoff", &failures)
-        expect(outputs(send(engine, cc(13, 96))), ["cc ch1 71:96"], "FX1 Y -> resonance", &failures)
+        expect(outputs(send(engine, cc(12, 64))), ["cc ch1 92:64"], "FX1 X -> chorus rate", &failures)
+        expect(outputs(send(engine, cc(13, 96))), ["cc ch1 91:96"], "FX1 Y -> chorus amount", &failures)
+        expect(outputs(send(engine, cc(14, 20))), ["cc ch1 9:21"], "FX1 Depth -> chorus engine", &failures)
 
         _ = send(engine, cc(110, 127))
-        expect(outputs(send(engine, cc(12, 20))), ["cc ch1 92:20"], "FX2 X -> chorus rate", &failures)
-        expect(outputs(send(engine, cc(13, 40))), ["cc ch1 91:40"], "FX2 Y -> chorus amount", &failures)
-        expect(outputs(send(engine, cc(14, 20))), ["cc ch1 9:21"], "FX2 Depth -> chorus engine", &failures)
+        expect(outputs(send(engine, cc(12, 20))), ["cc ch1 74:20"], "FX2 X -> cutoff", &failures)
+        expect(outputs(send(engine, cc(13, 40))), ["cc ch1 71:40"], "FX2 Y -> resonance", &failures)
 
         _ = send(engine, cc(114, 127))
         expect(outputs(send(engine, cc(12, 50))), ["cc ch1 72:50"], "FX3 X -> LFO1 rate", &failures)
@@ -103,11 +103,11 @@ enum NTS3SelfTest {
         return failures
     }
 
-    private static func testFX2DepthSelectsFXEngine() -> [String] {
+    private static func testFX1DepthSelectsFXEngine() -> [String] {
         let engine = ProVSMappingEngine(outputChannel: 1)
         var failures: [String] = []
 
-        _ = send(engine, cc(110, 127))
+        _ = send(engine, cc(106, 127))
         expect(outputs(send(engine, cc(14, 0))), ["cc ch1 9:21"], "lowest depth should select chorus", &failures)
         expect(outputs(send(engine, cc(14, 44))), [], "hysteresis should keep chorus near ensemble split", &failures)
         expect(outputs(send(engine, cc(14, 45))), ["cc ch1 9:64"], "depth above hysteresis should select ensemble", &failures)
@@ -128,11 +128,11 @@ enum NTS3SelfTest {
         _ = send(engine, cc(106, 127))
         _ = send(engine, cc(110, 127))
         expect(engine.snapshot.activeBank, .fx(2), "FX2 should win after activation", &failures)
-        expect(outputs(send(engine, cc(12, 64))), ["cc ch1 92:64"], "pad X should route to FX2", &failures)
+        expect(outputs(send(engine, cc(12, 64))), ["cc ch1 74:64"], "pad X should route to FX2", &failures)
 
         _ = send(engine, cc(110, 0))
         expect(engine.snapshot.activeBank, .fx(1), "FX1 should resume after FX2 off", &failures)
-        expect(outputs(send(engine, cc(13, 32))), ["cc ch1 71:32"], "pad Y should route to FX1", &failures)
+        expect(outputs(send(engine, cc(13, 32))), ["cc ch1 91:32"], "pad Y should route to FX1", &failures)
         return failures
     }
 
@@ -166,9 +166,9 @@ enum NTS3SelfTest {
         let engine = ProVSMappingEngine(outputChannel: 1)
         var failures: [String] = []
 
-        _ = send(engine, cc(106, 127))
+        _ = send(engine, cc(110, 127))
         expect(outputs(send(engine, cc(14, 70))), [], "FX depth should be unmapped", &failures)
-        expect(bank(.fx(1), in: engine.snapshot)?.depth.msb, 70, "FX depth should latch", &failures)
+        expect(bank(.fx(2), in: engine.snapshot)?.depth.msb, 70, "FX depth should latch", &failures)
         return failures
     }
 
@@ -212,7 +212,7 @@ enum NTS3SelfTest {
 
         expect(transformer.transform(packetBytes: [0xB0, 102, 127, 106, 127]), [], "switches should emit nothing", &failures)
         expect(transformer.transform(packetBytes: [0xB0, 12, 64]), [], "FX1 X should queue", &failures)
-        expect(transformer.flushPendingOutputs(), [[0xB3, 74, 64]], "flush should use output channel 4", &failures)
+        expect(transformer.flushPendingOutputs(), [[0xB3, 92, 64]], "flush should use output channel 4", &failures)
         return failures
     }
 

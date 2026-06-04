@@ -94,7 +94,7 @@ private final class MenuBarAppDelegate: NSObject, NSApplicationDelegate, NSMenuD
 
     private func makeDebugWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 740),
+            contentRect: NSRect(x: 0, y: 0, width: 1120, height: 620),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false

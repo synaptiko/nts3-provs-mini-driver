@@ -9,7 +9,7 @@ struct MappingDebugView: View {
             Divider()
             DashboardGrid(state: model.mappingState)
         }
-        .frame(minWidth: 1120, minHeight: 720)
+        .frame(minWidth: 1120, minHeight: 620)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
@@ -68,41 +68,40 @@ private struct DashboardGrid: View {
     ]
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 14) {
-                XYPadCard(state: state)
-                GlobalCard(bank: state.bank(.global))
-                ParameterCard(
-                    title: "Filter",
-                    bank: state.bank(.fx(1)),
-                    color: .cyan,
-                    fields: [
-                        ValueField(title: "Cutoff", axis: .x),
-                        ValueField(title: "Resonance", axis: .y)
-                    ]
-                )
-                EffectCard(bank: state.bank(.fx(2)))
-                ParameterCard(
-                    title: "LFO 1",
-                    bank: state.bank(.fx(3)),
-                    color: .orange,
-                    fields: [
-                        ValueField(title: "Rate", axis: .x),
-                        ValueField(title: "Amount", axis: .y)
-                    ]
-                )
-                ParameterCard(
-                    title: "LFO 2",
-                    bank: state.bank(.fx(4)),
-                    color: .green,
-                    fields: [
-                        ValueField(title: "Rate", axis: .x),
-                        ValueField(title: "Amount", axis: .y)
-                    ]
-                )
-            }
-            .padding(18)
+        LazyVGrid(columns: columns, spacing: 14) {
+            XYPadCard(state: state)
+            GlobalCard(bank: state.bank(.global))
+            EffectCard(bank: state.bank(.fx(1)))
+            ParameterCard(
+                title: "Filter",
+                bank: state.bank(.fx(2)),
+                color: .cyan,
+                fields: [
+                    ValueField(title: "Cutoff", axis: .x),
+                    ValueField(title: "Resonance", axis: .y)
+                ]
+            )
+            ParameterCard(
+                title: "LFO 1",
+                bank: state.bank(.fx(3)),
+                color: .orange,
+                fields: [
+                    ValueField(title: "Rate", axis: .x),
+                    ValueField(title: "Amount", axis: .y)
+                ]
+            )
+            ParameterCard(
+                title: "LFO 2",
+                bank: state.bank(.fx(4)),
+                color: .green,
+                fields: [
+                    ValueField(title: "Rate", axis: .x),
+                    ValueField(title: "Amount", axis: .y)
+                ]
+            )
         }
+        .padding(18)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }
 

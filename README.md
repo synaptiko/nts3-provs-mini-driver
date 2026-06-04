@@ -84,12 +84,12 @@ Switching banks latches the previous bank values. The app does not emit zero or 
 | Global X | Modulation | CC 1 |
 | Global Y | Portamento time | CC 5 |
 | Global Depth | Stored for debug only | none |
-| FX 1 X | Filter cutoff | CC 74 |
-| FX 1 Y | Filter resonance | CC 71 |
-| FX 1 Depth | Stored for debug only | none |
-| FX 2 X | Chorus rate | CC 92 |
-| FX 2 Y | Chorus amount | CC 91 |
-| FX 2 Depth | FX engine select: Chorus, Ensemble, Reverb | CC 9 |
+| FX 1 X | Chorus/Ensemble/Reverb primary control | CC 92 |
+| FX 1 Y | Chorus/Ensemble/Reverb secondary control | CC 91 |
+| FX 1 Depth | FX engine select: Chorus, Ensemble, Reverb | CC 9 |
+| FX 2 X | Filter cutoff | CC 74 |
+| FX 2 Y | Filter resonance | CC 71 |
+| FX 2 Depth | Stored for debug only | none |
 | FX 3 X | LFO 1 rate | CC 72 |
 | FX 3 Y | LFO 1 amount | CC 70 |
 | FX 3 Depth | Stored for debug only | none |
@@ -108,7 +108,7 @@ Switching banks latches the previous bank values. The app does not emit zero or 
 - `Stop`: stop the bridge.
 - `Quit`: stop the bridge and terminate the app.
 
-The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portamento, Filter, the currently selected FX engine, LFO 1, and LFO 2.
+The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portamento, the currently selected FX engine, Filter, LFO 1, and LFO 2.
 
 ## Hardware Verification
 
@@ -120,8 +120,8 @@ The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portament
 6. Start `swift run nts3-provs-mini-driver --ui --input "NTS-3" --output "PRO VS" --channel 1`.
 7. Open Debug from the menu-bar item.
 8. With no NTS-3 FX active, move the X/Y pad. Global X should send Modulation CC `1`, and Global Y should send Portamento time CC `5`.
-9. Turn on NTS-3 FX 1, touch the pad, and move X/Y. Pro VS filter cutoff/resonance should move.
-10. Turn on FX 2. X/Y should now move chorus rate/amount; FX 1 should stay latched. Move Depth through low/mid/high areas and confirm CC `9` selects Chorus, Ensemble, and Reverb.
+9. Turn on NTS-3 FX 1. X/Y should move the current Chorus/Ensemble/Reverb controls. Move Depth through low/mid/high areas and confirm CC `9` selects Chorus, Ensemble, and Reverb.
+10. Turn on FX 2. X/Y should now move filter cutoff/resonance; FX 1 should stay latched.
 11. Turn off FX 2. X/Y should route back to FX 1 with no reset burst.
 12. Repeat for FX 3 and FX 4 to verify LFO 1 and LFO 2 targets.
 13. Release the pad after moving a mapped bank. The app should emit no zero/reset message.
