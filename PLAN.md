@@ -41,16 +41,33 @@ The Pro VS Mini docs confirm many target CCs:
 
 | Pro VS Mini target | MIDI | Status |
 | --- | --- | --- |
-| Filter cutoff | CC 74, documented display range 0-99 | Confirmed |
+| Modulation | CC 1, range 0-127 | Confirmed |
+| Portamento time | CC 5, documented range 0-31 in current manual; firmware notes say CC 5 | Confirmed in firmware 2.x |
+| FX engine | CC 9, Chorus 0-42, Ensemble 43-84, Reverb 85-127 | Confirmed |
+| Voice A-D wave selection | CC 24-27, range 0-127 | Confirmed, selects oscillator waveforms rather than vector mix |
+| LFO 2 amount | CC 28, documented display range 0-99 | Confirmed |
+| Filter envelope amount | CC 47, range 0-127 | Confirmed |
+| LFO 1 waveform | CC 54, range 0-127, triangle/square/saw | Confirmed |
+| LFO 2 waveform | CC 55, range 0-127, triangle/square/saw | Confirmed |
+| LFO 1 destination | CC 56, range 0-127, VCF/OSC | Confirmed in ManualsLib V2.0 table; missing from Manuals+ mirror's extracted CC list |
+| LFO 1 amount | CC 70, documented display range 0-99 | Confirmed |
 | Filter resonance | CC 71, documented display range 0-99 | Confirmed |
+| LFO 1 rate | CC 72, documented display range 0-99 | Confirmed |
+| LFO 2 rate | CC 73, documented display range 0-99 | Confirmed |
+| Filter cutoff | CC 74, documented display range 0-99 | Confirmed |
+| Amplitude envelope ADSR | CC 81-84, documented display range 0-99 | Confirmed |
+| Filter envelope ADSR | CC 85-88, documented display range 0-99 | Confirmed |
 | Chorus depth/amount | CC 91, documented display range 0-99 | Confirmed |
 | Chorus rate | CC 92, documented display range 0-99 | Confirmed |
-| LFO 1 amount | CC 70, documented display range 0-99 | Confirmed |
-| LFO 1 rate | CC 72, documented display range 0-99 | Confirmed |
-| LFO 2 amount | CC 28, documented display range 0-99 | Confirmed |
-| LFO 2 rate | CC 73, documented display range 0-99 | Confirmed |
-| FX engine | CC 9, Chorus 0-42, Ensemble 43-84, Reverb 85-127 | Confirmed |
-| Voice A-D wave selection | CC 24-27, range 0-127 | Confirmed, but this selects waveforms, not vector mix |
+| Voice A-D fine tuning | CC 111-114, documented display range 0-99 | Confirmed |
+| Voice A-D coarse tuning | CC 115-118, documented display range 0-99 | Confirmed; current manual labels CC 118 as Voice C again, likely a typo for Voice D |
+
+Additional non-CC MIDI/external-control paths:
+
+- MIDI notes over DIN MIDI In or USB MIDI can play the synth; MIDI receive channel and MIDI velocity receive are configurable in the menu.
+- Program Change can change presets. Firmware 1.1.2 release notes say Program Change messages can change presets from `0-32`; because the synth has 32 programs, hardware should verify whether the practical usable range is `0...31`, `1...32`, or an inclusive off-by-one document typo.
+- MIDI/USB sync is documented via `Sync Source` and `Sync Type` settings. A Reddit hardware report on firmware 2.0.0 also confirms incoming MIDI transport/sync starts the internal sequencer/arpeggiator when Sync Source listens to MIDI, but the official manual does not provide a dedicated transport on/off setting.
+- SysEx send/receive is menu-documented for program bulk, current program, pattern bulk, and current pattern. The full SysEx patch format is not documented well enough for realtime control, but it is a documented path for preset/pattern transfer.
 
 Important gaps:
 
@@ -235,6 +252,8 @@ That branch already documents and implements a "most recently activated bank" id
 - Korg NTS-3 MIDI implementation TXT, downloaded locally to `.context/nts3-midi-implementation.txt`.
 - Behringer/Music Tribe Pro VS Mini Quick Start Guide mirror, extracted locally to `.context/pro-vs-mini-qsg.pdf`: https://gzhls.at/blob/ldb/4/3/f/9/8f6807381b0d217869bc44b01a4624195712.pdf
 - Pro VS Mini V3.0 user-guide mirror with firmware 2.0.0 CC table: https://manuals.plus/behringer/pro-vs-mini-portable-5-voice-hybrid-synthesizer-manual
+- ManualsLib current Pro VS Mini page 75 CC table, used to cross-check CC 56 and the full V3.0 table: https://www.manualslib.com/manual/3430666/Behringer-Pro-Vs-Mini.html?page=75
+- B&H current quick-start PDF search extract, used to cross-check CC 56 and the full V3.0 table where direct PDF download was Cloudflare-blocked locally: https://www.bhphotovideo.com/lit_files/1145286.pdf
 - Pro VS Mini downloads page, listing firmware 2.0.2 and the current manual: https://www.provsmini.com/pro-vs-mini-downloads.html
 - Pro VS Mini firmware 2.0.2 release notes, downloaded locally to `.context/provsmini-release-notes-2.0.2.pdf`: https://www.provsmini.com/downloads/Release-Notes_BE_0722-ABF_PRO%20VS%20MINI_v2-0-0_2025-01-10_Rev-0.pdf
 - Pro VS Mini firmware 1.1.2 release notes, specifically the LFO/MIX ENV SysEx parsing fix: https://www.provsmini.com/downloads/Release-Notes_BE_0722-ABF_PRO%20VS%20MINI_v1.1.2
