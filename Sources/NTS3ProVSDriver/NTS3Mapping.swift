@@ -310,6 +310,7 @@ enum MIDIOutputMessage: Equatable {
 struct ProVSAxisTargetSnapshot: Equatable, Identifiable {
     let axis: NTS3ControlAxis
     let target: ProVSControlTarget?
+    let outputValue: Int?
 
     var id: String { axis.id }
 }
@@ -368,7 +369,11 @@ struct ProVSMappingSnapshot: Equatable {
                     y: .zero,
                     depth: .zero,
                     axisTargets: NTS3ControlAxis.allCases.map { axis in
-                        ProVSAxisTargetSnapshot(axis: axis, target: ProVSMappingEngine.target(for: bank, axis: axis))
+                        ProVSAxisTargetSnapshot(
+                            axis: axis,
+                            target: ProVSMappingEngine.target(for: bank, axis: axis),
+                            outputValue: nil
+                        )
                     }
                 )
             },
@@ -440,7 +445,12 @@ final class ProVSMappingEngine {
                     y: state.y,
                     depth: state.depth,
                     axisTargets: NTS3ControlAxis.allCases.map { axis in
-                        ProVSAxisTargetSnapshot(axis: axis, target: Self.target(for: bank, axis: axis))
+                        let target = Self.target(for: bank, axis: axis)
+                        return ProVSAxisTargetSnapshot(
+                            axis: axis,
+                            target: target,
+                            outputValue: target.flatMap { lastQueuedValues[$0] }
+                        )
                     }
                 )
             },

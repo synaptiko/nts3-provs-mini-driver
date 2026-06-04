@@ -108,7 +108,7 @@ Switching banks latches the previous bank values. The app does not emit zero or 
 - `Stop`: stop the bridge.
 - `Quit`: stop the bridge and terminate the app.
 
-The Debug window shows the active bank, Pro VS parameter meters, global vector status, experimental volume/play state, recent outgoing MIDI, input touch/mute state, and latched 14-bit values.
+The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portamento, Filter, the currently selected FX engine, LFO 1, and LFO 2.
 
 ## Hardware Verification
 

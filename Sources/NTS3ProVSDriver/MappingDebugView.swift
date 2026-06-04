@@ -7,13 +7,7 @@ struct MappingDebugView: View {
         VStack(spacing: 0) {
             header
             Divider()
-            HStack(spacing: 0) {
-                ProVSPanelView(state: model.mappingState)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                Divider()
-                StatePanel(model: model)
-                    .frame(width: 360)
-            }
+            DashboardGrid(state: model.mappingState)
         }
         .frame(minWidth: 1120, minHeight: 720)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -32,9 +26,6 @@ struct MappingDebugView: View {
 
                 Spacer()
 
-                StatusPill(title: model.mappingState.activeBank.displayName, color: .accentColor)
-                StatusPill(title: "Ch \(model.mappingState.outputChannel)", color: .teal)
-
                 Button(model.isRunning ? "Restart" : "Start") {
                     model.restartBridge()
                 }
@@ -50,7 +41,6 @@ struct MappingDebugView: View {
                 labeledTextField("Input filter", text: $model.inputNameFilter, width: 210)
                 labeledTextField("Pro VS destination", text: $model.outputNameFilter, width: 250)
                 Spacer()
-                statusText
             }
         }
         .padding(16)
@@ -66,113 +56,173 @@ struct MappingDebugView: View {
                 .frame(width: width)
         }
     }
-
-    private var statusText: some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            ForEach(Array(model.statusMessages.suffix(2).enumerated()), id: \.offset) { _, message in
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-        }
-        .frame(maxWidth: 400, alignment: .trailing)
-    }
 }
 
-private struct ProVSPanelView: View {
+private struct DashboardGrid: View {
     let state: ProVSMappingSnapshot
+
+    private let columns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                BankStrip(state: state)
-                GlobalAndExperimentalRow(state: state)
-                ParameterSectionGrid(state: state)
+            LazyVGrid(columns: columns, spacing: 14) {
+                XYPadCard(state: state)
+                GlobalCard(bank: state.bank(.global))
+                ParameterCard(
+                    title: "Filter",
+                    bank: state.bank(.fx(1)),
+                    color: .cyan,
+                    fields: [
+                        ValueField(title: "Cutoff", axis: .x),
+                        ValueField(title: "Resonance", axis: .y)
+                    ]
+                )
+                EffectCard(bank: state.bank(.fx(2)))
+                ParameterCard(
+                    title: "LFO 1",
+                    bank: state.bank(.fx(3)),
+                    color: .orange,
+                    fields: [
+                        ValueField(title: "Rate", axis: .x),
+                        ValueField(title: "Amount", axis: .y)
+                    ]
+                )
+                ParameterCard(
+                    title: "LFO 2",
+                    bank: state.bank(.fx(4)),
+                    color: .green,
+                    fields: [
+                        ValueField(title: "Rate", axis: .x),
+                        ValueField(title: "Amount", axis: .y)
+                    ]
+                )
             }
             .padding(18)
         }
     }
 }
 
-private struct BankStrip: View {
+private struct XYPadCard: View {
     let state: ProVSMappingSnapshot
 
+    private var activeBank: ProVSBankSnapshot {
+        state.bank(state.activeBank)
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            ForEach(state.banks) { bank in
-                BankChip(bank: bank)
-            }
+        CardShell(
+            title: "X/Y Pad",
+            subtitle: activeBank.bank.displayName,
+            color: .accentColor,
+            isCurrent: true
+        ) {
+            VectorPad(valueX: activeBank.x, valueY: activeBank.y)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
 
-private struct BankChip: View {
+private struct GlobalCard: View {
     let bank: ProVSBankSnapshot
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(bank.isCurrent ? Color.accentColor : bank.isActive ? Color.green : Color.secondary.opacity(0.35))
-                .frame(width: 10, height: 10)
+        ParameterCard(
+            title: "Global",
+            bank: bank,
+            color: .accentColor,
+            fields: [
+                ValueField(title: "Modulation", axis: .x),
+                ValueField(title: "Portamento", axis: .y)
+            ]
+        )
+    }
+}
 
-            Text(bank.bank.displayName)
-                .font(.caption.weight(.semibold))
+private struct EffectCard: View {
+    let bank: ProVSBankSnapshot
 
-            Text(bank.isCurrent ? "Current" : bank.isActive ? "Active" : "Latched")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
+    private var engine: FXEngineDisplay {
+        FXEngineDisplay(bank: bank)
+    }
+
+    var body: some View {
+        ParameterCard(
+            title: engine.title,
+            bank: bank,
+            color: .purple,
+            fields: [
+                ValueField(title: engine.xLabel, axis: .x),
+                ValueField(title: engine.yLabel, axis: .y)
+            ]
+        )
+    }
+}
+
+private struct ParameterCard: View {
+    let title: String
+    let bank: ProVSBankSnapshot
+    let color: Color
+    let fields: [ValueField]
+
+    var body: some View {
+        CardShell(
+            title: title,
+            subtitle: bank.bank.displayName,
+            color: color,
+            isCurrent: bank.isCurrent
+        ) {
+            VStack(spacing: 14) {
+                ForEach(fields) { field in
+                    ParameterMeter(
+                        title: field.title,
+                        value: bank.value(for: field.axis),
+                        target: bank.target(for: field.axis),
+                        outputValue: bank.outputValue(for: field.axis),
+                        color: color
+                    )
+                }
+                Spacer(minLength: 0)
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct CardShell<Content: View>: View {
+    let title: String
+    let subtitle: String
+    let color: Color
+    let isCurrent: Bool
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(isCurrent ? color : Color.secondary.opacity(0.35))
+                    .frame(width: 11, height: 11)
+                Text(title)
+                    .font(.headline)
+                    .lineLimit(1)
+                Spacer()
+                Text(subtitle)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isCurrent ? color : .secondary)
+                    .lineLimit(1)
+            }
+
+            content
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 220, maxHeight: 220, alignment: .topLeading)
         .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
         .overlay {
             RoundedRectangle(cornerRadius: 8)
-                .stroke(bank.isCurrent ? Color.accentColor.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: bank.isCurrent ? 1.5 : 1)
+                .stroke(isCurrent ? color.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: isCurrent ? 1.5 : 1)
         }
-    }
-}
-
-private struct GlobalAndExperimentalRow: View {
-    let state: ProVSMappingSnapshot
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 14) {
-            GlobalVectorPanel(global: state.bank(.global))
-                .frame(maxWidth: .infinity)
-
-            ExperimentalPanel(state: state)
-                .frame(width: 250)
-        }
-    }
-}
-
-private struct GlobalVectorPanel: View {
-    let global: ProVSBankSnapshot
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Global Vector")
-                    .font(.headline)
-                StatusPill(title: "Mod + Portamento", color: .accentColor)
-                Spacer()
-            }
-
-            HStack(spacing: 14) {
-                VectorPad(valueX: global.x, valueY: global.y)
-                    .frame(width: 230, height: 150)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    AxisReadout(axis: .x, value: global.x, target: global.target(for: .x))
-                    AxisReadout(axis: .y, value: global.y, target: global.target(for: .y))
-                    AxisReadout(axis: .depth, value: global.depth, target: global.target(for: .depth))
-                }
-            }
-        }
-        .padding(14)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -198,7 +248,7 @@ private struct VectorPad: View {
                 }
                 .stroke(Color.primary.opacity(0.16), lineWidth: 1)
                 Circle()
-                    .fill(Color.secondary.opacity(0.35))
+                    .fill(Color.accentColor.opacity(0.75))
                     .frame(width: 16, height: 16)
                     .position(x: x, y: y)
             }
@@ -206,153 +256,34 @@ private struct VectorPad: View {
     }
 }
 
-private struct ExperimentalPanel: View {
-    let state: ProVSMappingSnapshot
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Experimental")
-                .font(.headline)
-
-            VStack(alignment: .leading, spacing: 10) {
-                IndicatorRow(
-                    title: "Volume",
-                    value: state.experimentalOptions.volumeMapping.displayName,
-                    isEnabled: state.experimentalOptions.volumeMapping != .disabled
-                )
-                IndicatorRow(
-                    title: "Play",
-                    value: state.experimentalOptions.playToggleEnabled ? (state.playToggleState ? "Start" : "Stop") : "Disabled",
-                    isEnabled: state.experimentalOptions.playToggleEnabled
-                )
-                AxisReadout(axis: .depth, value: state.volume, target: volumeTarget(for: state))
-            }
-        }
-        .padding(14)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func volumeTarget(for state: ProVSMappingSnapshot) -> ProVSControlTarget? {
-        state.experimentalOptions.volumeMapping.parameter.map {
-            ProVSControlTarget(bank: .global, axis: nil, parameter: $0)
-        }
-    }
-}
-
-private struct ParameterSectionGrid: View {
-    let state: ProVSMappingSnapshot
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 300), spacing: 14)], spacing: 14) {
-            ParameterSection(
-                title: "Filter",
-                bank: state.bank(.fx(1)),
-                color: .cyan,
-                rows: [
-                    ParameterRow(title: "Cutoff", axis: .x),
-                    ParameterRow(title: "Resonance", axis: .y)
-                ]
-            )
-            ParameterSection(
-                title: "Chorus",
-                bank: state.bank(.fx(2)),
-                color: .purple,
-                rows: [
-                    ParameterRow(title: "Rate", axis: .x),
-                    ParameterRow(title: "Amount", axis: .y)
-                ]
-            )
-            ParameterSection(
-                title: "LFO 1",
-                bank: state.bank(.fx(3)),
-                color: .orange,
-                rows: [
-                    ParameterRow(title: "Rate", axis: .x),
-                    ParameterRow(title: "Amount", axis: .y)
-                ]
-            )
-            ParameterSection(
-                title: "LFO 2",
-                bank: state.bank(.fx(4)),
-                color: .green,
-                rows: [
-                    ParameterRow(title: "Rate", axis: .x),
-                    ParameterRow(title: "Amount", axis: .y)
-                ]
-            )
-        }
-    }
-}
-
-private struct ParameterRow: Identifiable {
+private struct ValueField: Identifiable {
     let id = UUID()
     var title: String
     var axis: NTS3ControlAxis
-}
-
-private struct ParameterSection: View {
-    let title: String
-    let bank: ProVSBankSnapshot
-    let color: Color
-    let rows: [ParameterRow]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(bank.isCurrent ? color : bank.isActive ? color.opacity(0.7) : Color.secondary.opacity(0.35))
-                    .frame(width: 11, height: 11)
-                Text(title)
-                    .font(.headline)
-                Text(bank.bank.displayName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text(bank.isCurrent ? "Current" : bank.isActive ? "Active" : "Latched")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(bank.isCurrent ? color : .secondary)
-            }
-
-            ForEach(rows) { row in
-                ParameterMeter(
-                    title: row.title,
-                    value: bank.value(for: row.axis),
-                    target: bank.target(for: row.axis),
-                    color: color
-                )
-            }
-
-            ParameterMeter(
-                title: "Depth",
-                value: bank.depth,
-                target: bank.target(for: .depth),
-                color: .secondary
-            )
-        }
-        .padding(14)
-        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(bank.isCurrent ? color.opacity(0.65) : Color.primary.opacity(0.08), lineWidth: bank.isCurrent ? 1.5 : 1)
-        }
-    }
 }
 
 private struct ParameterMeter: View {
     let title: String
     let value: NTS3CC14Value
     let target: ProVSControlTarget?
+    let outputValue: Int?
     let color: Color
 
+    private var midiValue: Int {
+        outputValue ?? value.midi7BitValue
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
                     .font(.caption.weight(.semibold))
+                    .lineLimit(1)
                 Spacer()
                 Text(target.map { "CC \($0.parameter.controller)" } ?? "Unmapped")
                     .font(.caption)
                     .foregroundStyle(target == nil ? .secondary : .primary)
+                    .lineLimit(1)
             }
 
             GeometryReader { geometry in
@@ -361,13 +292,13 @@ private struct ParameterMeter: View {
                         .fill(Color.primary.opacity(0.08))
                     Capsule()
                         .fill(target == nil ? Color.secondary.opacity(0.35) : color.opacity(0.75))
-                        .frame(width: max(4, geometry.size.width * CGFloat(value.midi7BitValue) / 127.0))
+                        .frame(width: max(4, geometry.size.width * CGFloat(midiValue) / 127.0))
                 }
             }
             .frame(height: 8)
 
             HStack {
-                Text("MIDI \(value.midi7BitValue)")
+                Text("MIDI \(midiValue)")
                 Spacer()
                 Text("Display \(value.proVSDisplayValue)")
             }
@@ -377,142 +308,63 @@ private struct ParameterMeter: View {
     }
 }
 
-private struct AxisReadout: View {
-    let axis: NTS3ControlAxis
-    let value: NTS3CC14Value
-    let target: ProVSControlTarget?
+private enum FXEngineDisplay {
+    case chorus
+    case ensemble
+    case reverb
 
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(axis.rawValue)
-                .font(.caption.weight(.semibold))
-                .frame(width: 42, alignment: .leading)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(value.combined)")
-                    .font(.system(.caption, design: .monospaced).weight(.semibold))
-                Text(target?.displayName ?? "Unmapped")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+    init(bank: ProVSBankSnapshot) {
+        if let outputValue = bank.outputValue(for: .depth) {
+            switch outputValue {
+            case 0...42:
+                self = .chorus
+            case 43...84:
+                self = .ensemble
+            default:
+                self = .reverb
             }
+            return
+        }
+
+        switch bank.depth.midi7BitValue {
+        case 0...42:
+            self = .chorus
+        case 43...84:
+            self = .ensemble
+        default:
+            self = .reverb
         }
     }
-}
 
-private struct IndicatorRow: View {
-    let title: String
-    let value: String
-    let isEnabled: Bool
-
-    var body: some View {
-        HStack {
-            Circle()
-                .fill(isEnabled ? Color.green : Color.secondary.opacity(0.35))
-                .frame(width: 9, height: 9)
-            Text(title)
-                .font(.caption.weight(.semibold))
-            Spacer()
-            Text(value)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+    var title: String {
+        switch self {
+        case .chorus:
+            return "Chorus"
+        case .ensemble:
+            return "Ensemble"
+        case .reverb:
+            return "Reverb"
         }
     }
-}
 
-private struct StatePanel: View {
-    @ObservedObject var model: MappingDebugViewModel
-
-    private var state: ProVSMappingSnapshot {
-        model.mappingState
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                PanelSection(title: "Routing") {
-                    StateRow(label: "Current Bank", value: state.activeBank.displayName)
-                    StateRow(label: "Last FX", value: state.lastActivatedFX.map { "FX \($0)" } ?? "-")
-                    StateRow(label: "Touch", value: "\(state.padTouchValue)")
-                    StateRow(label: "Mute", value: "\(state.inputMuteValue)")
-                    StateRow(label: "Output Channel", value: "\(state.outputChannel)")
-                }
-
-                PanelSection(title: "Global") {
-                    let global = state.bank(.global)
-                    StateRow(label: "X", value: global.x.debugText)
-                    StateRow(label: "Y", value: global.y.debugText)
-                    StateRow(label: "Depth", value: global.depth.debugText)
-                    StateRow(label: "Volume", value: state.volume.debugText)
-                }
-
-                PanelSection(title: "Recent Output") {
-                    if state.recentOutputs.isEmpty {
-                        Text("No output yet")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(state.recentOutputs.reversed()) { output in
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("\(output.bankName) - \(output.targetName)")
-                                    .font(.caption.weight(.semibold))
-                                Text(output.detail)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-            .padding(16)
+    var xLabel: String {
+        switch self {
+        case .chorus, .ensemble:
+            return "Rate"
+        case .reverb:
+            return "Time"
         }
-        .background(Color(nsColor: .underPageBackgroundColor))
     }
-}
 
-private struct PanelSection<Content: View>: View {
-    let title: String
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            content
+    var yLabel: String {
+        switch self {
+        case .chorus:
+            return "Amount"
+        case .ensemble:
+            return "Depth"
+        case .reverb:
+            return "Level"
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct StateRow: View {
-    let label: String
-    let value: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 10)
-            Text(value)
-                .font(.system(.caption, design: .monospaced))
-                .multilineTextAlignment(.trailing)
-        }
-        .font(.caption)
-    }
-}
-
-private struct StatusPill: View {
-    let title: String
-    let color: Color
-
-    var body: some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(color.opacity(0.13), in: Capsule())
-            .foregroundStyle(color)
     }
 }
 
@@ -542,7 +394,11 @@ private extension ProVSMappingSnapshot {
             y: .zero,
             depth: .zero,
             axisTargets: NTS3ControlAxis.allCases.map { axis in
-                ProVSAxisTargetSnapshot(axis: axis, target: ProVSMappingEngine.target(for: bank, axis: axis))
+                ProVSAxisTargetSnapshot(
+                    axis: axis,
+                    target: ProVSMappingEngine.target(for: bank, axis: axis),
+                    outputValue: nil
+                )
             }
         )
     }
@@ -562,5 +418,9 @@ private extension ProVSBankSnapshot {
 
     func target(for axis: NTS3ControlAxis) -> ProVSControlTarget? {
         axisTargets.first { $0.axis == axis }?.target
+    }
+
+    func outputValue(for axis: NTS3ControlAxis) -> Int? {
+        axisTargets.first { $0.axis == axis }?.outputValue
     }
 }
