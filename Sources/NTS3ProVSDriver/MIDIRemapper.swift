@@ -26,8 +26,8 @@ final class MIDIRemapper {
     ) {
         self.configuration = configuration
         self.transformer = transformer ?? NTS3MappingTransformer(
-            outputMode: configuration.outputMode,
-            outputChannel: configuration.outputChannel
+            outputChannel: configuration.outputChannel,
+            experimentalOptions: configuration.experimentalOptions
         )
         self.packetHandler = packetHandler
         self.statusHandler = statusHandler
@@ -45,7 +45,6 @@ final class MIDIRemapper {
         } else {
             reportStatus("Remapping MIDI and logging decoded input messages.")
         }
-        reportStatus("Output mode: \(configuration.outputMode.rawValue)")
         reportStatus("Output channel: \(configuration.outputChannel)")
         connectMatchingDestination()
         connectMatchingSources()

@@ -5,11 +5,11 @@ struct Configuration {
     var outputNameFilter = "PRO VS"
     var clientName = "NTS-3 Pro VS Mini Driver"
     var outputChannel = 1
+    var experimentalOptions = ProVSExperimentalOptions.disabled
     var connectAllSources = false
     var listDevices = false
     var launchUI = false
     var runSelfTest = false
-    var outputMode: NTS3OutputMode = .pair
     var quiet = false
     var showRealtime = false
 
@@ -26,6 +26,12 @@ struct Configuration {
                 clientName = try Self.nextValue(after: argument, from: &iterator)
             case "--channel", "-c":
                 outputChannel = try Self.channelValue(after: argument, from: &iterator)
+            case "--volume-cc7":
+                experimentalOptions.volumeMapping = .channelVolume
+            case "--volume-cc11":
+                experimentalOptions.volumeMapping = .expression
+            case "--play-toggle":
+                experimentalOptions.playToggleEnabled = true
             case "--all":
                 connectAllSources = true
             case "--list", "-l":
@@ -34,8 +40,6 @@ struct Configuration {
                 launchUI = true
             case "--self-test":
                 runSelfTest = true
-            case "--trim":
-                outputMode = .trim
             case "--quiet", "-q":
                 quiet = true
             case "--show-realtime":
@@ -103,14 +107,16 @@ func printUsage() {
 
         Options:
           -i, --input <text>          Source name substring to connect to. Default: NTS-3
-          -o, --output <text>         Destination name substring. Default: PRO VS
-          -c, --channel <1-16>        Output MIDI channel. Default: 1
+              -o, --output <text>         Destination name substring. Default: PRO VS
+              -c, --channel <1-16>        Output MIDI channel. Default: 1
+              --volume-cc7                Experimental: map NTS-3 volume to CC 7
+              --volume-cc11               Experimental: map NTS-3 volume to CC 11
+              --play-toggle               Experimental: Input Mute press sends Start/Stop
               --client-name <name>    CoreMIDI client name. Default: NTS-3 Pro VS Mini Driver
               --all                   Connect to every MIDI source
           -l, --list                  List MIDI sources/destinations and exit
               --ui                    Launch the menu-bar app and auto-start the bridge
               --self-test             Run deterministic mapping self-tests and exit
-              --trim                  Emit mapped 7-bit MSB CCs only; default preserves MSB/LSB pairs
           -q, --quiet                 Forward MIDI without per-message logging
               --show-realtime         Include MIDI clock/active-sensing in logs
           -h, --help                  Show this help
