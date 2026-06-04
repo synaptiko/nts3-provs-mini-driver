@@ -131,15 +131,19 @@ private struct XYPadCard: View {
         state.bank(state.activeBank)
     }
 
+    private var activeColor: Color {
+        activeBank.bank.dashboardColor
+    }
+
     var body: some View {
         CardShell(
             title: "X/Y Pad",
             subtitle: activeBank.bank.displayName,
-            color: .accentColor,
+            color: activeColor,
             isCurrent: true,
             onSelect: {}
         ) {
-            VectorPad(valueX: activeBank.x, valueY: activeBank.y) { x, y in
+            VectorPad(valueX: activeBank.x, valueY: activeBank.y, color: activeColor) { x, y in
                 model.setXY(bank: activeBank.bank, normalizedX: x, normalizedY: y)
             }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -177,17 +181,40 @@ private struct EffectCard: View {
     }
 
     var body: some View {
-        ParameterCard(
+        CardShell(
             title: engine.title,
-            bank: bank,
-            color: .purple,
-            fields: [
-                ValueField(title: engine.xLabel, axis: .x),
-                ValueField(title: engine.yLabel, axis: .y)
-            ],
-            onSelect: onSelect,
-            onValueChange: onValueChange
-        )
+            subtitle: bank.bank.displayName,
+            color: bank.bank.dashboardColor,
+            isCurrent: bank.isCurrent,
+            onSelect: onSelect
+        ) {
+            VStack(spacing: 8) {
+                FXEngineSelector(activeEngine: engine) { selectedEngine in
+                    onSelect()
+                    onValueChange(.depth, selectedEngine.midiValue)
+                }
+
+                ParameterMeter(
+                    title: engine.xLabel,
+                    value: bank.x,
+                    target: bank.target(for: .x),
+                    outputValue: bank.outputValue(for: .x),
+                    color: bank.bank.dashboardColor,
+                    onEditingBegan: onSelect,
+                    onValueChange: { value in onValueChange(.x, value) }
+                )
+
+                ParameterMeter(
+                    title: engine.yLabel,
+                    value: bank.y,
+                    target: bank.target(for: .y),
+                    outputValue: bank.outputValue(for: .y),
+                    color: bank.bank.dashboardColor,
+                    onEditingBegan: onSelect,
+                    onValueChange: { value in onValueChange(.y, value) }
+                )
+            }
+        }
     }
 }
 
@@ -207,7 +234,7 @@ private struct ParameterCard: View {
             isCurrent: bank.isCurrent,
             onSelect: onSelect
         ) {
-            VStack(spacing: 14) {
+            VStack(spacing: 10) {
                 ForEach(fields) { field in
                     ParameterMeter(
                         title: field.title,
@@ -215,8 +242,8 @@ private struct ParameterCard: View {
                         target: bank.target(for: field.axis),
                         outputValue: bank.outputValue(for: field.axis),
                         color: color,
+                        onEditingBegan: onSelect,
                         onValueChange: { value in
-                            onSelect()
                             onValueChange(field.axis, value)
                         }
                     )
@@ -268,16 +295,24 @@ private struct CardShell<Content: View>: View {
 private struct VectorPad: View {
     let valueX: NTS3CC14Value
     let valueY: NTS3CC14Value
+    let color: Color
     var onChange: (Double, Double) -> Void = { _, _ in }
 
     var body: some View {
         GeometryReader { geometry in
-            let x = CGFloat(valueX.normalized) * geometry.size.width
-            let y = (1.0 - CGFloat(valueY.normalized)) * geometry.size.height
+            let plotInset: CGFloat = 13
+            let plotWidth = max(geometry.size.width - (plotInset * 2), 1)
+            let plotHeight = max(geometry.size.height - (plotInset * 2), 1)
+            let x = plotInset + (CGFloat(valueX.normalized) * plotWidth)
+            let y = plotInset + ((1.0 - CGFloat(valueY.normalized)) * plotHeight)
 
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(nsColor: .underPageBackgroundColor))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(color.opacity(0.2), lineWidth: 1)
+                    }
                 GridLines()
                     .stroke(Color.primary.opacity(0.08), lineWidth: 1)
                 Path { path in
@@ -288,16 +323,16 @@ private struct VectorPad: View {
                 }
                 .stroke(Color.primary.opacity(0.16), lineWidth: 1)
                 Circle()
-                    .fill(Color.accentColor.opacity(0.75))
+                    .fill(color.opacity(0.78))
                     .frame(width: 18, height: 18)
                     .position(x: x, y: y)
             }
             .contentShape(Rectangle())
-            .gesture(
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
-                        let normalizedX = clamp(Double(gesture.location.x / max(geometry.size.width, 1)))
-                        let normalizedY = clamp(Double(1.0 - gesture.location.y / max(geometry.size.height, 1)))
+                        let normalizedX = clamp(Double((gesture.location.x - plotInset) / plotWidth))
+                        let normalizedY = clamp(Double(1.0 - ((gesture.location.y - plotInset) / plotHeight)))
                         onChange(normalizedX, normalizedY)
                     }
             )
@@ -321,7 +356,10 @@ private struct ParameterMeter: View {
     let target: ProVSControlTarget?
     let outputValue: Int?
     let color: Color
+    let onEditingBegan: () -> Void
     let onValueChange: (Int) -> Void
+
+    @State private var isDragging = false
 
     private var midiValue: Int {
         outputValue ?? value.midi7BitValue
@@ -329,7 +367,20 @@ private struct ParameterMeter: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(alignment: .leading, spacing: 6) {
+            let drag = DragGesture(minimumDistance: 0)
+                .onChanged { gesture in
+                    if !isDragging {
+                        isDragging = true
+                        onEditingBegan()
+                    }
+
+                    onValueChange(midiValue(at: gesture.location.x, width: geometry.size.width))
+                }
+                .onEnded { _ in
+                    isDragging = false
+                }
+
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(title)
                         .font(.caption.weight(.semibold))
@@ -358,24 +409,54 @@ private struct ParameterMeter: View {
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(.secondary)
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        let fraction = max(0.0, min(gesture.location.x / max(geometry.size.width, 1), 1.0))
-                        onValueChange(Int((fraction * 127.0).rounded()))
-                    }
-            )
+            .highPriorityGesture(drag)
         }
-        .frame(height: 66)
+        .frame(height: 58)
+    }
+
+    private func midiValue(at xPosition: CGFloat, width: CGFloat) -> Int {
+        let fraction = max(0.0, min(xPosition / max(width, 1), 1.0))
+        return Int((fraction * 127.0).rounded())
     }
 }
 
-private enum FXEngineDisplay {
+private struct FXEngineSelector: View {
+    let activeEngine: FXEngineDisplay
+    let onSelect: (FXEngineDisplay) -> Void
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(FXEngineDisplay.allCases) { engine in
+                Button {
+                    onSelect(engine)
+                } label: {
+                    Text(engine.title)
+                        .font(.caption.weight(engine == activeEngine ? .semibold : .medium))
+                        .foregroundStyle(engine == activeEngine ? Color.primary : Color.secondary.opacity(0.6))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 5)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private enum FXEngineDisplay: CaseIterable, Identifiable {
     case chorus
     case ensemble
     case reverb
+
+    var id: String {
+        title
+    }
 
     init(bank: ProVSBankSnapshot) {
         if let outputValue = bank.outputValue(for: .depth) {
@@ -428,6 +509,17 @@ private enum FXEngineDisplay {
             return "Depth"
         case .reverb:
             return "Level"
+        }
+    }
+
+    var midiValue: Int {
+        switch self {
+        case .chorus:
+            return 21
+        case .ensemble:
+            return 64
+        case .reverb:
+            return 106
         }
     }
 }
@@ -486,5 +578,24 @@ private extension ProVSBankSnapshot {
 
     func outputValue(for axis: NTS3ControlAxis) -> Int? {
         axisTargets.first { $0.axis == axis }?.outputValue
+    }
+}
+
+private extension MappingBank {
+    var dashboardColor: Color {
+        switch self {
+        case .global:
+            return .accentColor
+        case .fx(1):
+            return .purple
+        case .fx(2):
+            return .cyan
+        case .fx(3):
+            return .orange
+        case .fx(4):
+            return .green
+        default:
+            return .secondary
+        }
     }
 }

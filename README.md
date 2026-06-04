@@ -108,7 +108,7 @@ Switching banks latches the previous bank values. The app does not emit zero or 
 - `Stop`: stop the bridge.
 - `Quit`: stop the bridge and terminate the app.
 
-The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portamento, the currently selected FX engine, Filter, LFO 1, and LFO 2. Click cards to switch the active bank, drag the pad to edit X/Y, or drag a card meter to edit that value directly.
+The Debug window shows a 3x2 grid: one live X/Y pad, Global modulation/portamento, the currently selected FX engine, Filter, LFO 1, and LFO 2. Click cards to switch the active bank, click Chorus/Ensemble/Reverb in FX 1 to select the engine, drag the pad to edit X/Y, or drag a card meter to edit that value directly.
 
 ## Hardware Verification
 

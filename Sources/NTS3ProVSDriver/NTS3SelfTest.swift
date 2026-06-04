@@ -239,6 +239,12 @@ enum NTS3SelfTest {
             &failures
         )
         expect(
+            transformer.setValue(bank: .fx(1), axis: .depth, value: NTS3CC14Value(midi7BitValue: 106)),
+            [[0xB1, 9, 106]],
+            "manual effects engine select",
+            &failures
+        )
+        expect(
             transformer.setXY(
                 bank: .global,
                 x: NTS3CC14Value(midi7BitValue: 10),
