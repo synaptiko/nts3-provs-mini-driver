@@ -2,7 +2,7 @@ import Foundation
 
 final class MIDIWatchViewModel: ObservableObject {
     @Published var inputNameFilter: String
-    @Published var virtualSourceName: String
+    @Published var outputNameFilter: String
     @Published var statusMessages: [String] = []
     @Published var watches: [CCWatch] = []
     @Published var states: [UUID: CCWatchRuntimeState] = [:]
@@ -19,7 +19,7 @@ final class MIDIWatchViewModel: ObservableObject {
     init(configuration: Configuration) {
         baseConfiguration = configuration
         inputNameFilter = configuration.inputNameFilter
-        virtualSourceName = configuration.virtualSourceName
+        outputNameFilter = configuration.outputNameFilter
         watches = Self.loadWatches(defaultsKey: userDefaultsKey)
         if watches.isEmpty {
             watches = CCWatch.nts3Defaults
@@ -36,7 +36,7 @@ final class MIDIWatchViewModel: ObservableObject {
 
         var configuration = baseConfiguration
         configuration.inputNameFilter = inputNameFilter
-        configuration.virtualSourceName = virtualSourceName
+        configuration.outputNameFilter = outputNameFilter
         configuration.quiet = true
 
         let remapper = MIDIRemapper(

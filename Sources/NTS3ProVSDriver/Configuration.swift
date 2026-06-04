@@ -2,8 +2,9 @@ import Foundation
 
 struct Configuration {
     var inputNameFilter = "NTS-3"
-    var virtualSourceName = "NTS-3 Pro VS Mini Driver"
+    var outputNameFilter = "PRO VS"
     var clientName = "NTS-3 Pro VS Mini Driver"
+    var outputChannel = 1
     var connectAllSources = false
     var listDevices = false
     var launchUI = false
@@ -19,10 +20,12 @@ struct Configuration {
             switch argument {
             case "--input", "-i":
                 inputNameFilter = try Self.nextValue(after: argument, from: &iterator)
-            case "--virtual-name", "-v":
-                virtualSourceName = try Self.nextValue(after: argument, from: &iterator)
+            case "--output", "-o":
+                outputNameFilter = try Self.nextValue(after: argument, from: &iterator)
             case "--client-name":
                 clientName = try Self.nextValue(after: argument, from: &iterator)
+            case "--channel", "-c":
+                outputChannel = try Self.channelValue(after: argument, from: &iterator)
             case "--all":
                 connectAllSources = true
             case "--list", "-l":
@@ -54,10 +57,22 @@ struct Configuration {
         }
         return value
     }
+
+    private static func channelValue(
+        after argument: String,
+        from iterator: inout ArraySlice<String>.Iterator
+    ) throws -> Int {
+        let value = try nextValue(after: argument, from: &iterator)
+        guard let channel = Int(value), (1...16).contains(channel) else {
+            throw ConfigurationError.invalidChannel(value)
+        }
+        return channel
+    }
 }
 
 enum ConfigurationError: Error, CustomStringConvertible {
     case helpRequested
+    case invalidChannel(String)
     case missingValue(String)
     case unknownArgument(String)
 
@@ -65,6 +80,8 @@ enum ConfigurationError: Error, CustomStringConvertible {
         switch self {
         case .helpRequested:
             return ""
+        case .invalidChannel(let value):
+            return "Invalid MIDI channel: \(value). Expected 1...16."
         case .missingValue(let argument):
             return "Missing value after \(argument)."
         case .unknownArgument(let argument):
@@ -78,17 +95,18 @@ func printUsage() {
         """
         NTS-3 Pro VS Mini Driver
 
-        Reads MIDI from a hardware source, creates a virtual MIDI source, and forwards
-        the mapped NTS-3 control stream while logging useful decoded messages.
+        Reads MIDI from a Korg NTS-3 source, maps selected controls, and sends
+        the resulting MIDI directly to a Behringer Pro VS Mini destination.
 
         Usage:
           nts3-provs-mini-driver [options]
 
         Options:
           -i, --input <text>          Source name substring to connect to. Default: NTS-3
-          -v, --virtual-name <name>   Virtual MIDI source name. Default: NTS-3 Pro VS Mini Driver
+          -o, --output <text>         Destination name substring. Default: PRO VS
+          -c, --channel <1-16>        Output MIDI channel. Default: 1
               --client-name <name>    CoreMIDI client name. Default: NTS-3 Pro VS Mini Driver
-              --all                   Connect to every MIDI source except our virtual source
+              --all                   Connect to every MIDI source
           -l, --list                  List MIDI sources/destinations and exit
               --ui                    Launch the menu-bar app and auto-start the bridge
               --self-test             Run deterministic mapping self-tests and exit
@@ -97,11 +115,10 @@ func printUsage() {
               --show-realtime         Include MIDI clock/active-sensing in logs
           -h, --help                  Show this help
 
-        Ableton Live setup:
+        Hardware setup:
           1. Start this process and keep it running.
-          2. In Live's MIDI preferences, enable Track/Remote for the virtual input
-             named "NTS-3 Pro VS Mini Driver" or your custom --virtual-name.
-          3. Use the virtual input in MIDI mapping or on a MIDI track.
+          2. Enable external MIDI CC receive on the Pro VS Mini.
+          3. Run with --list if either endpoint name needs a different substring.
         """
     )
 }

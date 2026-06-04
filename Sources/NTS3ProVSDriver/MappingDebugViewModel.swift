@@ -6,7 +6,7 @@ final class MappingDebugViewModel: ObservableObject {
     private static let midiLearnPulseCount = 40
 
     @Published var inputNameFilter: String
-    @Published var virtualSourceName: String
+    @Published var outputNameFilter: String
     @Published var statusMessages: [String] = []
     @Published var isRunning = false
     @Published var startupError: String?
@@ -21,7 +21,7 @@ final class MappingDebugViewModel: ObservableObject {
     init(configuration: Configuration) {
         baseConfiguration = configuration
         inputNameFilter = configuration.inputNameFilter
-        virtualSourceName = configuration.virtualSourceName
+        outputNameFilter = configuration.outputNameFilter
         mappingState = .initial(outputMode: configuration.outputMode)
     }
 
@@ -34,10 +34,13 @@ final class MappingDebugViewModel: ObservableObject {
 
         var configuration = baseConfiguration
         configuration.inputNameFilter = inputNameFilter
-        configuration.virtualSourceName = virtualSourceName
+        configuration.outputNameFilter = outputNameFilter
         configuration.quiet = true
 
-        let transformer = NTS3MappingTransformer(outputMode: configuration.outputMode) { [weak self] snapshot in
+        let transformer = NTS3MappingTransformer(
+            outputMode: configuration.outputMode,
+            outputChannel: configuration.outputChannel
+        ) { [weak self] snapshot in
             DispatchQueue.main.async {
                 self?.mappingState = snapshot
             }
@@ -136,7 +139,11 @@ final class MappingDebugViewModel: ObservableObject {
     private func sendMIDILearnPulse(for target: NTS3MappingOutputID, tick: Int) {
         let combinedValue = Self.midiLearnPulseValues[tick % Self.midiLearnPulseValues.count]
         let value = NTS3CC14Value(combined: combinedValue)
-        let messages = target.messages(value: value, channel: 1, outputMode: baseConfiguration.outputMode)
+        let messages = target.messages(
+            value: value,
+            channel: baseConfiguration.outputChannel,
+            outputMode: baseConfiguration.outputMode
+        )
         remapper?.send(messages: messages)
     }
 

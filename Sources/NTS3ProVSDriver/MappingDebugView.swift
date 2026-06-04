@@ -56,7 +56,7 @@ struct MappingDebugView: View {
 
             HStack(spacing: 12) {
                 labeledTextField("Input filter", text: $model.inputNameFilter, width: 210)
-                labeledTextField("Virtual source", text: $model.virtualSourceName, width: 250)
+                labeledTextField("Pro VS destination", text: $model.outputNameFilter, width: 250)
                 Spacer()
                 statusText
             }

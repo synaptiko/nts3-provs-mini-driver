@@ -264,6 +264,10 @@ struct MIDICCMessage: Equatable {
     var controller: Int
     var value: Int
 
+    func routed(to channel: Int) -> MIDICCMessage {
+        MIDICCMessage(channel: channel, controller: controller, value: value)
+    }
+
     var bytes: [UInt8] {
         [
             UInt8(0xB0 | UInt8(max(0, min(channel - 1, 15)))),
@@ -1052,14 +1056,17 @@ private extension NTS3MappingEngine {
 final class NTS3MappingTransformer: MIDITransformer {
     private let parser = MIDIControlChangeParser()
     private let engine: NTS3MappingEngine
+    private let outputChannel: Int
     private let lock = NSLock()
     private var midiLearnSoloTarget: NTS3MappingOutputID?
 
     init(
         outputMode: NTS3OutputMode,
+        outputChannel: Int = 1,
         onStateChange: ((NTS3MappingSnapshot) -> Void)? = nil
     ) {
         engine = NTS3MappingEngine(outputMode: outputMode)
+        self.outputChannel = outputChannel
         engine.onStateChange = onStateChange
         onStateChange?(engine.snapshot)
     }
@@ -1069,7 +1076,8 @@ final class NTS3MappingTransformer: MIDITransformer {
         defer { lock.unlock() }
 
         return parser.parse(packetBytes: packetBytes).flatMap { change in
-            engine.handle(change: change).map(\.bytes)
+            engine.handle(change: change)
+                .map { $0.routed(to: outputChannel).bytes }
         }
     }
 
@@ -1082,7 +1090,8 @@ final class NTS3MappingTransformer: MIDITransformer {
             return []
         }
 
-        return engine.flushPendingOutputs().map(\.bytes)
+        return engine.flushPendingOutputs()
+            .map { $0.routed(to: outputChannel).bytes }
     }
 
     func setMIDILearnSoloTarget(_ target: NTS3MappingOutputID?) {

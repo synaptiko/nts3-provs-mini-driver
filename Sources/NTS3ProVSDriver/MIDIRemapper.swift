@@ -11,9 +11,11 @@ final class MIDIRemapper {
     private let outputQueue = DispatchQueue(label: "NTS-3 Pro VS Driver Output")
     private var client = MIDIClientRef()
     private var inputPort = MIDIPortRef()
-    private var virtualSource = MIDIEndpointRef()
+    private var outputPort = MIDIPortRef()
+    private var destination = MIDIEndpointRef()
     private var connectedSources = Set<MIDIEndpointRef>()
     private var hasReportedNoMatch = false
+    private var hasReportedNoDestination = false
     private var flushTimer: DispatchSourceTimer?
 
     init(
@@ -23,24 +25,29 @@ final class MIDIRemapper {
         statusHandler: ((String) -> Void)? = nil
     ) {
         self.configuration = configuration
-        self.transformer = transformer ?? NTS3MappingTransformer(outputMode: configuration.outputMode)
+        self.transformer = transformer ?? NTS3MappingTransformer(
+            outputMode: configuration.outputMode,
+            outputChannel: configuration.outputChannel
+        )
         self.packetHandler = packetHandler
         self.statusHandler = statusHandler
     }
 
     func start() throws {
         try createClient()
-        try createVirtualSource()
+        try createOutputPort()
         try createInputPort()
         startFlushTimer()
 
-        reportStatus("Virtual MIDI source: \(configuration.virtualSourceName)")
+        reportStatus("MIDI destination filter: \(configuration.outputNameFilter)")
         if configuration.quiet {
             reportStatus("Forwarding MIDI without per-message logging.")
         } else {
             reportStatus("Remapping MIDI and logging decoded input messages.")
         }
         reportStatus("Output mode: \(configuration.outputMode.rawValue)")
+        reportStatus("Output channel: \(configuration.outputChannel)")
+        connectMatchingDestination()
         connectMatchingSources()
         if statusHandler == nil {
             print("Press Ctrl-C to stop.")
@@ -60,10 +67,11 @@ final class MIDIRemapper {
             MIDIPortDispose(inputPort)
             inputPort = 0
         }
-        if virtualSource != 0 {
-            MIDIEndpointDispose(virtualSource)
-            virtualSource = 0
+        if outputPort != 0 {
+            MIDIPortDispose(outputPort)
+            outputPort = 0
         }
+        destination = 0
         if client != 0 {
             MIDIClientDispose(client)
             client = 0
@@ -72,7 +80,7 @@ final class MIDIRemapper {
 
     func send(messages: [MIDICCMessage]) {
         outputQueue.async { [weak self] in
-            guard let self, self.virtualSource != 0 else {
+            guard let self, self.destination != 0 else {
                 return
             }
 
@@ -89,9 +97,9 @@ final class MIDIRemapper {
         try checkMIDIStatus(status, "MIDIClientCreateWithBlock")
     }
 
-    private func createVirtualSource() throws {
-        let status = MIDISourceCreate(client, configuration.virtualSourceName as CFString, &virtualSource)
-        try checkMIDIStatus(status, "MIDISourceCreate")
+    private func createOutputPort() throws {
+        let status = MIDIOutputPortCreate(client, "NTS-3 Pro VS Mini Output" as CFString, &outputPort)
+        try checkMIDIStatus(status, "MIDIOutputPortCreate")
     }
 
     private func createInputPort() throws {
@@ -107,6 +115,7 @@ final class MIDIRemapper {
         switch messageID {
         case .msgObjectAdded, .msgObjectRemoved, .msgSetupChanged:
             DispatchQueue.main.async { [weak self] in
+                self?.connectMatchingDestination()
                 self?.connectMatchingSources()
             }
         default:
@@ -120,7 +129,7 @@ final class MIDIRemapper {
 
         for index in 0..<sourceCount {
             let source = MIDIGetSource(index)
-            guard source != 0, source != virtualSource else {
+            guard source != 0 else {
                 continue
             }
 
@@ -157,9 +166,39 @@ final class MIDIRemapper {
 
     private func shouldConnect(toSourceNamed name: String) -> Bool {
         if configuration.connectAllSources {
-            return name != configuration.virtualSourceName
+            return true
         }
         return name.localizedCaseInsensitiveContains(configuration.inputNameFilter)
+    }
+
+    private func connectMatchingDestination() {
+        let destinationCount = MIDIGetNumberOfDestinations()
+
+        for index in 0..<destinationCount {
+            let candidate = MIDIGetDestination(index)
+            guard candidate != 0 else {
+                continue
+            }
+
+            let name = midiDisplayName(candidate)
+            guard name.localizedCaseInsensitiveContains(configuration.outputNameFilter) else {
+                continue
+            }
+
+            if destination != candidate {
+                destination = candidate
+                hasReportedNoDestination = false
+                reportStatus("Connected destination: \(midiEndpointSummary(candidate))")
+            }
+            return
+        }
+
+        destination = 0
+        if !hasReportedNoDestination {
+            hasReportedNoDestination = true
+            reportStatus("No MIDI destination matched \"\(configuration.outputNameFilter)\". Waiting for it to appear.")
+            reportStatus("Run with --list to inspect CoreMIDI destination names.")
+        }
     }
 
     private func receive(
@@ -208,7 +247,7 @@ final class MIDIRemapper {
     }
 
     private func flushPendingOutputs() {
-        guard virtualSource != 0 else {
+        guard destination != 0 else {
             return
         }
 
@@ -219,6 +258,9 @@ final class MIDIRemapper {
 
     private func send(packetBytes bytes: [UInt8]) {
         guard !bytes.isEmpty else {
+            return
+        }
+        guard outputPort != 0, destination != 0 else {
             return
         }
 
@@ -233,9 +275,9 @@ final class MIDIRemapper {
             var packet = MIDIPacketListInit(&packetList)
             packet = MIDIPacketListAdd(&packetList, listSize, packet, 0, buffer.count, baseAddress)
 
-            let status = MIDIReceived(virtualSource, &packetList)
+            let status = MIDISend(outputPort, destination, &packetList)
             if status != noErr {
-                fputs("MIDIReceived failed with OSStatus \(status)\n", stderr)
+                fputs("MIDISend failed with OSStatus \(status)\n", stderr)
             }
         }
     }
